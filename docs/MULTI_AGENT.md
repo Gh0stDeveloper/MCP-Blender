@@ -51,4 +51,4 @@ Each agent independently selects provider, connection mode and model.
 - per-agent output is capped;
 - specialist work runs in parallel to reduce wall-clock latency.
 
-A hosted edition should additionally add per-organization monthly budgets, hard spend caps and per-provider usage metering.
+For larger local/team installations, optional per-project budgets, hard spend caps and per-provider usage metering can be added around the same orchestrator.
