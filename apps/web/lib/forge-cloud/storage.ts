@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 
 import {
   GetObjectCommand,
@@ -68,7 +68,10 @@ export async function putObject(
   } else {
     const root = resolve(process.env.NEXORA_STORAGE_ROOT ?? ".nexora-storage");
     const path = resolve(root, clean);
-    if (!path.startsWith(root)) throw new Error("storage path escaped root");
+    const rel = relative(root, path);
+    if (rel.startsWith("..") || rel.includes(`..${process.platform === "win32" ? "\\" : "/"}`)) {
+      throw new Error("storage path escaped root");
+    }
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, bytes);
   }
@@ -90,6 +93,9 @@ export async function getObject(key: string): Promise<Uint8Array> {
 
   const root = resolve(process.env.NEXORA_STORAGE_ROOT ?? ".nexora-storage");
   const path = resolve(root, clean);
-  if (!path.startsWith(root)) throw new Error("storage path escaped root");
+  const rel = relative(root, path);
+  if (rel.startsWith("..") || rel.includes(`..${process.platform === "win32" ? "\\" : "/"}`)) {
+    throw new Error("storage path escaped root");
+  }
   return readFile(path);
 }
