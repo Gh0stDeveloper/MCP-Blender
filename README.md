@@ -117,6 +117,23 @@ ngrok http 8765
 
 Use the gateway bearer token and, where available, provider edge authentication/rate limits.
 
+## Nexora Forge Cloud
+
+The optional Cloud layer adds team-oriented project orchestration and multi-agent model routing without moving Blender execution into the browser.
+
+Current Cloud foundation includes:
+
+- configurable agent teams;
+- OpenAI, Anthropic, DeepSeek and xAI direct providers;
+- Vercel AI Gateway mode;
+- custom OpenAI-compatible providers;
+- per-agent model selection;
+- coordinator → parallel specialists → reviewer orchestration;
+- dry-run validation;
+- PostgreSQL control-plane schema for organizations, projects, devices, assets, versions, locks and jobs.
+
+Open `/cloud` in the web app. See `docs/SAAS.md` and `docs/MULTI_AGENT.md`.
+
 ## OpenAI connection modes
 
 | Use case | Auth mode | Connection |
