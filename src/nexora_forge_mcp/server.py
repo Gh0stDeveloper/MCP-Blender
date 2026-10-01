@@ -31,19 +31,18 @@ bridge = BlenderBridgeClient(
 )
 
 def _create_mcp() -> Any:
-    common = {
-        "title": "Nexora Forge MCP",
-        "description": "Secure AI-native Blender production gateway",
-        "version": "0.2.0",
-        "instructions": (
-            "Use structured Blender tools first. Prefer batch_execute for multi-step edits. "
-            "Inspect the scene before destructive changes and save checkpoints during long jobs. "
-            "Unrestricted Python execution is an explicit opt-in capability."
-        ),
-    }
+    instructions = (
+        "Use structured Blender tools first. Prefer batch_execute for multi-step edits. "
+        "Inspect the scene before destructive changes and save checkpoints during long jobs. "
+        "Unrestricted Python execution is an explicit opt-in capability."
+    )
     if settings.auth_mode == "oauth":
         return MCPServer(
             "Nexora Forge MCP",
+            title="Nexora Forge MCP",
+            description="Secure AI-native Blender production gateway",
+            version="0.2.0",
+            instructions=instructions,
             token_verifier=IntrospectionTokenVerifier(settings),
             auth=AuthSettings(
                 issuer_url=AnyHttpUrl(settings.oauth_issuer_url),
@@ -51,9 +50,14 @@ def _create_mcp() -> Any:
                 required_scopes=settings.oauth_scope_list(),
                 validate_token_resource=True,
             ),
-            **common,
         )
-    return MCPServer("Nexora Forge MCP", **common)
+    return MCPServer(
+        "Nexora Forge MCP",
+        title="Nexora Forge MCP",
+        description="Secure AI-native Blender production gateway",
+        version="0.2.0",
+        instructions=instructions,
+    )
 
 
 mcp = _create_mcp()
@@ -157,13 +161,13 @@ async def health(_: Request) -> JSONResponse:
     )
 
 
-@mcp.tool(annotations=READ_ONLY)
+@mcp.tool(annotations=READ_ONLY)  # type: ignore[untyped-decorator]
 async def blender_status() -> dict[str, Any]:
     """Return Blender bridge status, Blender version, current file and scene metadata."""
     return await _call("system.status")
 
 
-@mcp.tool(annotations=READ_ONLY)
+@mcp.tool(annotations=READ_ONLY)  # type: ignore[untyped-decorator]
 async def scene_snapshot(
     include_objects: bool = True,
     include_materials: bool = True,
@@ -180,7 +184,7 @@ async def scene_snapshot(
     )
 
 
-@mcp.tool(annotations=WRITE_TOOL)
+@mcp.tool(annotations=WRITE_TOOL)  # type: ignore[untyped-decorator]
 async def scene_save(path: str | None = None) -> dict[str, Any]:
     """Save the Blender project; optional paths are restricted to the configured workspace."""
     params: dict[str, Any] = {}
@@ -189,7 +193,7 @@ async def scene_save(path: str | None = None) -> dict[str, Any]:
     return await _call("scene.save", params, mutating=True)
 
 
-@mcp.tool(annotations=DESTRUCTIVE_TOOL)
+@mcp.tool(annotations=DESTRUCTIVE_TOOL)  # type: ignore[untyped-decorator]
 async def scene_new(confirm: bool = False) -> dict[str, Any]:
     """Start a clean scene. confirm must be true because this is destructive."""
     if not confirm:
@@ -197,7 +201,7 @@ async def scene_new(confirm: bool = False) -> dict[str, Any]:
     return await _call("scene.new", {"confirm": True}, mutating=True)
 
 
-@mcp.tool(annotations=WRITE_TOOL)
+@mcp.tool(annotations=WRITE_TOOL)  # type: ignore[untyped-decorator]
 async def create_primitive(
     kind: Literal["cube", "sphere", "uv_sphere", "ico_sphere", "cylinder", "cone", "plane", "torus"],
     name: str,
@@ -221,7 +225,7 @@ async def create_primitive(
     )
 
 
-@mcp.tool(annotations=WRITE_TOOL)
+@mcp.tool(annotations=WRITE_TOOL)  # type: ignore[untyped-decorator]
 async def transform_object(
     name: str,
     location: list[float] | None = None,
@@ -236,7 +240,7 @@ async def transform_object(
     )
 
 
-@mcp.tool(annotations=DESTRUCTIVE_TOOL)
+@mcp.tool(annotations=DESTRUCTIVE_TOOL)  # type: ignore[untyped-decorator]
 async def delete_object(name: str, confirm: bool = False) -> dict[str, Any]:
     """Delete one Blender object by name."""
     if not confirm:
@@ -244,7 +248,7 @@ async def delete_object(name: str, confirm: bool = False) -> dict[str, Any]:
     return await _call("object.delete", {"name": name}, mutating=True)
 
 
-@mcp.tool(annotations=WRITE_TOOL)
+@mcp.tool(annotations=WRITE_TOOL)  # type: ignore[untyped-decorator]
 async def duplicate_object(name: str, new_name: str) -> dict[str, Any]:
     """Duplicate an object and its mesh datablock."""
     return await _call(
@@ -254,7 +258,7 @@ async def duplicate_object(name: str, new_name: str) -> dict[str, Any]:
     )
 
 
-@mcp.tool(annotations=WRITE_TOOL)
+@mcp.tool(annotations=WRITE_TOOL)  # type: ignore[untyped-decorator]
 async def create_material(
     name: str,
     base_color: list[float] | None = None,
@@ -274,7 +278,7 @@ async def create_material(
     )
 
 
-@mcp.tool(annotations=WRITE_TOOL)
+@mcp.tool(annotations=WRITE_TOOL)  # type: ignore[untyped-decorator]
 async def assign_material(object_name: str, material_name: str) -> dict[str, Any]:
     """Assign an existing material to an object."""
     return await _call(
@@ -284,7 +288,7 @@ async def assign_material(object_name: str, material_name: str) -> dict[str, Any
     )
 
 
-@mcp.tool(annotations=WRITE_TOOL)
+@mcp.tool(annotations=WRITE_TOOL)  # type: ignore[untyped-decorator]
 async def add_modifier(
     object_name: str,
     modifier_type: str,
@@ -304,7 +308,7 @@ async def add_modifier(
     )
 
 
-@mcp.tool(annotations=WRITE_TOOL)
+@mcp.tool(annotations=WRITE_TOOL)  # type: ignore[untyped-decorator]
 async def create_light(
     name: str,
     light_type: Literal["POINT", "SUN", "SPOT", "AREA"] = "AREA",
@@ -326,7 +330,7 @@ async def create_light(
     )
 
 
-@mcp.tool(annotations=WRITE_TOOL)
+@mcp.tool(annotations=WRITE_TOOL)  # type: ignore[untyped-decorator]
 async def create_camera(
     name: str = "Camera",
     location: list[float] | None = None,
@@ -348,7 +352,7 @@ async def create_camera(
     )
 
 
-@mcp.tool(annotations=WRITE_TOOL)
+@mcp.tool(annotations=WRITE_TOOL)  # type: ignore[untyped-decorator]
 async def keyframe_insert(
     object_name: str,
     frame: int,
@@ -368,7 +372,7 @@ async def keyframe_insert(
     )
 
 
-@mcp.tool(annotations=WRITE_TOOL)
+@mcp.tool(annotations=WRITE_TOOL)  # type: ignore[untyped-decorator]
 async def render_preview(
     filename: str = "preview.png",
     resolution_x: int = 768,
@@ -389,7 +393,7 @@ async def render_preview(
     )
 
 
-@mcp.tool(annotations=WRITE_TOOL)
+@mcp.tool(annotations=WRITE_TOOL)  # type: ignore[untyped-decorator]
 async def render_preview_image(
     filename: str = "preview.png",
     resolution_x: int = 768,
@@ -417,7 +421,7 @@ async def render_preview_image(
     return Image(path=rendered_path)
 
 
-@mcp.tool(annotations=WRITE_TOOL)
+@mcp.tool(annotations=WRITE_TOOL)  # type: ignore[untyped-decorator]
 async def import_asset(path: str) -> dict[str, Any]:
     """Import a supported FBX, OBJ, glTF/GLB or STL asset from the workspace."""
     return await _call(
@@ -427,7 +431,7 @@ async def import_asset(path: str) -> dict[str, Any]:
     )
 
 
-@mcp.tool(annotations=DESTRUCTIVE_TOOL)
+@mcp.tool(annotations=DESTRUCTIVE_TOOL)  # type: ignore[untyped-decorator]
 async def export_asset(
     path: str,
     object_names: list[str] | None = None,
@@ -443,7 +447,7 @@ async def export_asset(
     )
 
 
-@mcp.tool(annotations=DESTRUCTIVE_TOOL)
+@mcp.tool(annotations=DESTRUCTIVE_TOOL)  # type: ignore[untyped-decorator]
 async def batch_execute(steps: list[dict[str, Any]]) -> dict[str, Any]:
     """Execute multiple structured Blender operations in order with one bridge round-trip."""
     if len(steps) > 100:
@@ -456,7 +460,7 @@ async def batch_execute(steps: list[dict[str, Any]]) -> dict[str, Any]:
     return await _call("batch.execute", {"steps": steps}, mutating=True)
 
 
-@mcp.tool(annotations=UNRESTRICTED_TOOL)
+@mcp.tool(annotations=UNRESTRICTED_TOOL)  # type: ignore[untyped-decorator]
 async def blender_execute_python(code: str) -> dict[str, Any]:
     """Execute Blender Python. Requires unrestricted profile and explicit opt-in."""
     if len(code) > 100_000:
@@ -469,7 +473,7 @@ async def blender_execute_python(code: str) -> dict[str, Any]:
     )
 
 
-@mcp.tool(annotations=READ_ONLY)
+@mcp.tool(annotations=READ_ONLY)  # type: ignore[untyped-decorator]
 async def nexora_capabilities() -> dict[str, Any]:
     """Describe server permission mode and supported workflow categories."""
     return {
@@ -498,7 +502,7 @@ async def nexora_capabilities() -> dict[str, Any]:
 
 
 
-@mcp.tool(annotations=WRITE_TOOL)
+@mcp.tool(annotations=WRITE_TOOL)  # type: ignore[untyped-decorator]
 async def create_mesh(
     name: str,
     vertices: list[list[float]],
@@ -514,7 +518,7 @@ async def create_mesh(
     )
 
 
-@mcp.tool(annotations=WRITE_TOOL)
+@mcp.tool(annotations=WRITE_TOOL)  # type: ignore[untyped-decorator]
 async def smart_uv_project(
     object_name: str,
     angle_limit: float = 1.1519173063162575,
@@ -527,7 +531,7 @@ async def smart_uv_project(
     )
 
 
-@mcp.tool(annotations=WRITE_TOOL)
+@mcp.tool(annotations=WRITE_TOOL)  # type: ignore[untyped-decorator]
 async def create_armature(
     name: str = "Armature",
     location: list[float] | None = None,
@@ -540,7 +544,7 @@ async def create_armature(
     )
 
 
-@mcp.tool(annotations=WRITE_TOOL)
+@mcp.tool(annotations=WRITE_TOOL)  # type: ignore[untyped-decorator]
 async def add_bone(
     armature_name: str,
     bone_name: str,
@@ -564,7 +568,7 @@ async def add_bone(
     )
 
 
-@mcp.tool(annotations=WRITE_TOOL)
+@mcp.tool(annotations=WRITE_TOOL)  # type: ignore[untyped-decorator]
 async def parent_with_auto_weights(
     mesh_name: str,
     armature_name: str,
@@ -577,7 +581,7 @@ async def parent_with_auto_weights(
     )
 
 
-@mcp.tool(annotations=DESTRUCTIVE_TOOL)
+@mcp.tool(annotations=DESTRUCTIVE_TOOL)  # type: ignore[untyped-decorator]
 async def structured_blender_operation(
     operation: str,
     params: dict[str, Any] | None = None,
