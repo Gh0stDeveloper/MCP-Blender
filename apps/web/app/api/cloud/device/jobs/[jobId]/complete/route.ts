@@ -18,14 +18,14 @@ export async function POST(
   };
   if (!body.leaseToken) return Response.json({ error: "leaseToken is required" }, { status: 400 });
   try {
-    await finishJobExecution(
+    const status = await finishJobExecution(
       device,
       jobId,
       body.leaseToken,
       body.summary ?? "Device Agent completed the Blender execution plan.",
       body.operationResults ?? [],
     );
-    return Response.json({ ok: true, status: "awaiting_approval" });
+    return Response.json({ ok: true, status });
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : "job_completion_failed" },
