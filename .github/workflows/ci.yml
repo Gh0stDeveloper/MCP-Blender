@@ -28,7 +28,7 @@ jobs:
       - name: Tests
         run: uv run pytest
       - name: Compile Python surfaces
-        run: python -m compileall -q blender_extension examples
+        run: python -m compileall -q blender_extension examples device_agent
 
   web:
     name: SaaS web

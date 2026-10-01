@@ -16,6 +16,7 @@ export default function CloudPage() {
           NEXORA <span>FORGE</span>
         </Link>
         <nav>
+          <Link href="/cloud/pipeline">Pipeline</Link>
           <Link href="/dashboard">Gateway</Link>
           <Link href="/">Site</Link>
         </nav>
