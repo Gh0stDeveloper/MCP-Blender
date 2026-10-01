@@ -12,7 +12,7 @@ from starlette.responses import JSONResponse
 
 from .audit import AuditLogger
 from .bridge import BlenderBridgeClient, BlenderBridgeError
-from .config import Settings, get_settings
+from .config import get_settings
 from .security import BearerTokenMiddleware
 
 logger = logging.getLogger("nexora_forge_mcp")
