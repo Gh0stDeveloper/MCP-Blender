@@ -22,7 +22,8 @@ export async function GET(
   const artifact = rows[0];
   if (!artifact) return Response.json({ error: "artifact_not_found" }, { status: 404 });
   const bytes = await getObject(artifact.storage_key);
-  return new Response(bytes, {
+  const body = Uint8Array.from(bytes).buffer;
+  return new Response(body, {
     headers: {
       "Content-Type": artifact.content_type,
       "Content-Length": String(bytes.byteLength),
