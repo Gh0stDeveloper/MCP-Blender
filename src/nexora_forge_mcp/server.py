@@ -95,7 +95,7 @@ async def _call(
     return {"request_id": request_id, **result}
 
 
-@mcp.custom_route("/health", methods=["GET"])
+@mcp.custom_route("/health", methods=["GET"])  # type: ignore[untyped-decorator]
 async def health(_: Request) -> JSONResponse:
     try:
         blender = await bridge.health()
