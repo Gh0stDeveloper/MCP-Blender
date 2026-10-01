@@ -16,6 +16,7 @@ alter table jobs
   add column if not exists operation_results jsonb not null default '[]'::jsonb,
   add column if not exists require_approval boolean not null default true,
   add column if not exists leased_by_device_id uuid references devices(id) on delete set null,
+  add column if not exists executed_by_device_id uuid references devices(id) on delete set null,
   add column if not exists lease_token_hash text,
   add column if not exists lease_expires_at timestamptz,
   add column if not exists attempt_count integer not null default 0,
