@@ -21,7 +21,7 @@ export default function Dashboard() {
     <main className="shell dashboard">
       <header className="nav">
         <Link className="brand" href="/">NEXORA <span>FORGE</span></Link>
-        <Link href="/">Back to site</Link>
+        <nav><Link href="/cloud">Forge Cloud</Link><Link href="/">Back to site</Link></nav>
       </header>
 
       <section className="dashboardHero">
