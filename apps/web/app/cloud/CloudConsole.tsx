@@ -131,13 +131,12 @@ export default function CloudConsole() {
       current.map((agent) => {
         if (agent.id !== id) return agent;
         const next = { ...agent, ...patch };
+        if (next.provider === "custom") {
+          next.mode = "direct";
+        }
         if (patch.provider || patch.mode) {
           next.model =
-            modelFor(
-              catalog,
-              (patch.provider ?? agent.provider) as ProviderId,
-              (patch.mode ?? agent.mode) as ProviderMode,
-            ) ?? next.model;
+            modelFor(catalog, next.provider, next.mode) ?? next.model;
         }
         return next;
       }),
