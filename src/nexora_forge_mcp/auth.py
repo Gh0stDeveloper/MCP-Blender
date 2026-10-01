@@ -47,12 +47,19 @@ class IntrospectionTokenVerifier(TokenVerifier):
 
         try:
             async with httpx.AsyncClient(timeout=self.settings.oauth_timeout_seconds) as client:
-                response = await client.post(
-                    self.settings.oauth_introspection_url,
-                    data=form,
-                    auth=auth,
-                    headers={"Accept": "application/json"},
-                )
+                if auth is None:
+                    response = await client.post(
+                        self.settings.oauth_introspection_url,
+                        data=form,
+                        headers={"Accept": "application/json"},
+                    )
+                else:
+                    response = await client.post(
+                        self.settings.oauth_introspection_url,
+                        data=form,
+                        auth=auth,
+                        headers={"Accept": "application/json"},
+                    )
             response.raise_for_status()
             payload = response.json()
         except (httpx.HTTPError, ValueError) as exc:
