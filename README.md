@@ -4,7 +4,7 @@
 
 ### AI-native 3D production for Blender
 
-Secure MCP automation, multi-agent orchestration, collaborative asset production and human-reviewed Blender workflows.
+A secure MCP automation platform I built to connect modern AI systems with Blender, coordinate multi-agent 3D workflows, manage collaborative asset production and keep a human approval step before final versions are published.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/Gh0stDeveloper/MCP-Blender/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/Gh0stDeveloper/MCP-Blender/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/Gh0stDeveloper/MCP-Blender?style=for-the-badge)](LICENSE)
@@ -27,16 +27,16 @@ Secure MCP automation, multi-agent orchestration, collaborative asset production
 
 ## Overview
 
-Nexora Forge turns an AI client into a structured Blender production operator without exposing Blender directly to the Internet.
+I built Nexora Forge to turn an MCP-capable AI client into a structured Blender production operator without exposing Blender directly to the Internet.
 
-It combines four layers:
+The project is split into four main layers:
 
-- **Nexora Forge MCP Gateway** — Streamable HTTP MCP server with authentication, permission profiles, auditing and structured Blender tools.
-- **Blender Extension Bridge** — loopback-only bridge that safely dispatches `bpy` work on Blender's main thread.
-- **Nexora Forge Cloud** — optional PostgreSQL-backed collaboration/control plane for projects, devices, jobs, assets, versions and review.
-- **Device Agent** — outbound-only workstation worker that leases jobs from Cloud, drives local Blender, uploads artifacts/previews and waits for human approval.
+- **Nexora Forge MCP Gateway** — the Streamable HTTP MCP server that handles authentication, permission profiles, auditing and structured Blender tools.
+- **Blender Extension Bridge** — a loopback-only bridge that dispatches `bpy` work back onto Blender's main thread.
+- **Nexora Forge Cloud** — the optional PostgreSQL-backed collaboration and control plane for projects, devices, jobs, assets, versions and review.
+- **Device Agent** — an outbound-only workstation worker that leases jobs from Cloud, controls the local Blender bridge, uploads artifacts/previews and waits for human approval.
 
-The project is suitable for characters, creatures, zombies, weapons, props, skins/materials, environments, lobbies, rigs, animations, emotes, previews and game-ready exports.
+My goal is to make the same platform useful for both individual creators and teams. It can be used for characters, creatures, zombies, weapons, props, skins/materials, environments, lobbies, rigs, animations, emotes, previews and game-ready exports.
 
 ## Technology
 
@@ -59,11 +59,13 @@ The project is suitable for characters, creatures, zombies, weapons, props, skin
 [![xAI](https://img.shields.io/badge/-xAI-000000)](https://x.ai/)
 [![Vercel AI Gateway](https://img.shields.io/badge/-AI_Gateway-000000?logo=vercel&logoColor=white)](https://vercel.com/ai-gateway)
 
-A custom OpenAI-compatible endpoint can also be configured for additional providers.
+I also included support for a custom OpenAI-compatible endpoint so I am not forced to hard-code every future provider into the core.
 
 ---
 
 ## Architecture
+
+I deliberately keep the public-facing services separated from Blender itself.
 
 ```mermaid
 flowchart LR
@@ -95,6 +97,8 @@ flowchart LR
 
 ## What it can do
 
+I focused the structured MCP surface on operations that are useful for real production instead of exposing Blender as one giant unsafe remote shell.
+
 | Area | Capabilities |
 | --- | --- |
 | Scene | inspect, save, reset, snapshots |
@@ -116,9 +120,13 @@ See [docs/TOOL_CATALOG.md](docs/TOOL_CATALOG.md) for the full MCP surface.
 
 ## Nexora Forge Cloud
 
-Forge Cloud adds collaborative production without moving Blender execution into a browser or shared server.
+I added Forge Cloud so the project can grow beyond a single workstation without turning Blender into a shared public server.
+
+The Cloud layer coordinates people, agents, devices, assets and production jobs while Blender continues to run locally on each enrolled workstation.
 
 ### Human collaboration
+
+The current Cloud foundation supports:
 
 - organizations and project workspaces;
 - project members and roles;
@@ -131,7 +139,7 @@ Forge Cloud adds collaborative production without moving Blender execution into 
 
 ### Multi-agent collaboration
 
-An Agent Team can mix providers and models in the same production request.
+I designed Agent Teams so one production request can use different AI providers and models at the same time.
 
 ```mermaid
 flowchart TD
@@ -145,7 +153,7 @@ flowchart TD
     V --> P["Conflict-free execution plan"]
 ```
 
-Each agent independently selects:
+Each agent can independently select:
 
 - role;
 - provider;
@@ -153,7 +161,7 @@ Each agent independently selects:
 - direct provider API or AI Gateway route;
 - enabled/disabled state.
 
-Dry-run mode validates an Agent Team without sending provider requests.
+Dry-run mode lets me validate an Agent Team without sending provider requests or consuming provider tokens.
 
 ---
 
@@ -189,6 +197,8 @@ sequenceDiagram
 
 ### Lease guarantees
 
+I use leases instead of permanent locks so abandoned clients do not block production forever.
+
 - PostgreSQL `FOR UPDATE SKIP LOCKED` prevents multiple devices from claiming the same queued job.
 - Every job lease has a separate secret lease token and expiry.
 - Device heartbeats extend both the job lease and the associated asset lock.
@@ -197,7 +207,7 @@ sequenceDiagram
 
 ### Human approval
 
-A completed Device Agent job enters `awaiting_approval`.
+A completed Device Agent job enters `awaiting_approval` instead of becoming a published asset version automatically.
 
 Open:
 
@@ -205,11 +215,11 @@ Open:
 /cloud/review/<jobId>
 ```
 
-A reviewer can:
+From there I can:
 
-- **Approve & publish** — promotes the latest `.blend` or export artifact to the next immutable asset version.
-- **Request changes** — returns the job to the queue without publishing a version.
-- **Reject** — closes the job and releases the asset lock.
+- **Approve & publish** — promote the latest `.blend` or export artifact to the next immutable asset version.
+- **Request changes** — return the job to the queue without publishing a version.
+- **Reject** — close the job and release the asset lock.
 
 ---
 
@@ -250,13 +260,13 @@ Default bridge:
 http://127.0.0.1:9876
 ```
 
-> The Blender bridge must remain on loopback. Do not expose port `9876` publicly.
+> I intentionally keep the Blender bridge on loopback. Port `9876` should never be exposed directly to the Internet.
 
 ---
 
 ## Remote MCP access
 
-Three gateway modes are available:
+I included three gateway modes so the same project can work locally, through a private tunnel or as a stable remote MCP resource server.
 
 | Mode | Intended use |
 | --- | --- |
@@ -295,14 +305,14 @@ psql "$DATABASE_URL" -f deploy/postgres/002_production_pipeline.sql
 
 ### 2. Object storage
 
-Development/local:
+For development or a small self-hosted installation:
 
 ```env
 NEXORA_STORAGE_DRIVER=local
 NEXORA_STORAGE_ROOT=.nexora-storage
 ```
 
-Production/S3-compatible:
+For production I can switch to S3-compatible storage:
 
 ```env
 NEXORA_STORAGE_DRIVER=s3
@@ -313,7 +323,7 @@ NEXORA_S3_ACCESS_KEY_ID=...
 NEXORA_S3_SECRET_ACCESS_KEY=...
 ```
 
-The storage adapter works with S3-compatible services such as AWS S3, Cloudflare R2 or MinIO when configured with the appropriate endpoint/credentials.
+The storage adapter works with S3-compatible services such as AWS S3, Cloudflare R2 or MinIO when configured with the appropriate endpoint and credentials.
 
 ### 3. Web control plane
 
@@ -336,7 +346,7 @@ Useful routes:
 
 ## Device Agent
 
-After enrolling a workstation through `/cloud/pipeline` or the enrollment API, save the one-time device token.
+After enrolling a workstation through `/cloud/pipeline` or the enrollment API, I save the one-time device token on that workstation.
 
 ```bash
 export NEXORA_CLOUD_URL=https://forge.example.com
@@ -356,7 +366,7 @@ The Device Agent:
 7. uploads preview/Blend/exports to object storage;
 8. submits the job to human review.
 
-It never opens a public inbound workstation port.
+I designed it as an outbound-only worker. It does not open a public inbound port on the workstation.
 
 See [device_agent/README.md](device_agent/README.md).
 
@@ -384,7 +394,7 @@ See [device_agent/README.md](device_agent/README.md).
 
 ## Configuration
 
-The full documented environment template is [.env.example](.env.example).
+The complete environment template is available in [.env.example](.env.example).
 
 <details>
 <summary><strong>Important security switches</strong></summary>
@@ -403,7 +413,7 @@ NEXORA_MAX_ARTIFACT_BYTES=104857600
 NEXORA_JOB_LEASE_SECONDS=900
 ```
 
-Raw Blender Python is intentionally disabled by default and is never accepted in the Cloud structured-job allowlist.
+I keep raw Blender Python disabled by default, and the Cloud structured-job pipeline never accepts `python.execute`.
 
 </details>
 
@@ -430,9 +440,9 @@ Raw Blender Python is intentionally disabled by default and is never accepted in
 
 ## Security model
 
-Nexora Forge can modify Blender scenes and files; unrestricted mode can execute Python with the workstation user's permissions.
+Nexora Forge can modify Blender scenes and files. In unrestricted mode it can also execute Python with the workstation user's permissions, so I treat this project like remote developer access rather than a harmless visualization plugin.
 
-Production recommendations:
+For production I recommend:
 
 1. Keep the Blender bridge on `127.0.0.1`.
 2. Use different secrets for the public MCP gateway, Cloud API and Blender bridge.
@@ -440,7 +450,7 @@ Production recommendations:
 4. Store Device Agent tokens in an OS secret store or protected service environment.
 5. Use PostgreSQL with encrypted transport and least-privilege credentials.
 6. Use private object storage buckets.
-7. Keep raw Python disabled unless explicitly required.
+7. Keep raw Python disabled unless it is explicitly needed.
 8. Rotate secrets after accidental disclosure.
 9. Put Cloud behind a real account/organization identity layer before offering a public multi-tenant hosted service.
 
@@ -448,26 +458,37 @@ See [docs/SECURITY.md](docs/SECURITY.md).
 
 ---
 
-## Project status
+## Hosted SaaS additions
 
-| Component | Status |
-| --- | --- |
-| MCP gateway | ✅ Implemented |
-| Blender extension bridge | ✅ Implemented |
-| Structured modeling/rigging/render tools | ✅ Implemented |
-| Native MCP image preview | ✅ Implemented |
-| Static / local / OAuth MCP auth modes | ✅ Implemented |
-| OpenAI Secure MCP Tunnel workflow | ✅ Documented/integrated |
-| Multi-provider Agent Teams | ✅ Implemented |
-| PostgreSQL Cloud control plane | ✅ Implemented |
-| Asset locks | ✅ Implemented |
-| Job leasing + heartbeat | ✅ Implemented |
-| Device Agent | ✅ Implemented |
-| Local/S3-compatible artifact storage | ✅ Implemented |
-| Human preview/approval gate | ✅ Implemented |
-| Approved asset version promotion | ✅ Implemented |
-| Public hosted account login/billing | ◻️ Deployment-specific layer |
-| Secret-vault-backed per-org BYOK | ◻️ Recommended hosted-SaaS extension |
+The self-hosted MCP, Cloud control plane, Device Agent, asset locks, versioning, storage, previews and approval pipeline are already part of the project.
+
+There are two pieces I intentionally leave as **hosted SaaS deployment layers** rather than hard-coding them into the open-source core:
+
+### Public account login and billing
+
+A public commercial deployment still needs a real user-facing identity and billing layer.
+
+That means integrating whichever provider the deployment owner chooses for:
+
+- account signup/login;
+- passwordless, OAuth or enterprise SSO;
+- organization invitations and identity mapping;
+- subscription plans;
+- quotas and metering;
+- invoices/payments;
+- account suspension and lifecycle management.
+
+I do not couple the core project to one authentication or billing vendor because self-hosted users may not need billing at all, while hosted deployments may prefer completely different providers.
+
+### Secret-vault-backed per-organization BYOK
+
+The Cloud schema already uses a `secret_ref` concept instead of a plaintext provider-key field.
+
+For a public multi-tenant SaaS, I still recommend connecting that reference to a dedicated encrypted secret manager or KMS so every organization can bring its own OpenAI, Anthropic, DeepSeek, xAI or compatible provider credentials without exposing raw keys to the application database or browser.
+
+In other words, BYOK support is prepared at the data-model level, but the actual vault implementation is deployment-specific because different installations may use AWS Secrets Manager, GCP Secret Manager, Azure Key Vault, HashiCorp Vault, another KMS-backed service or a private internal vault.
+
+Neither of these two layers blocks the local/self-hosted production pipeline. They matter when Nexora Forge is deployed as a public multi-user commercial service.
 
 ---
 
@@ -489,9 +510,11 @@ See [docs/SECURITY.md](docs/SECURITY.md).
 
 ## Contributing
 
-Issues and pull requests are welcome. Keep changes scoped, use clear commit messages, preserve the local-only Blender trust boundary and ensure CI stays green.
+Issues and pull requests are welcome.
 
-For new Blender operations, prefer typed/structured tools over raw Python whenever possible.
+When contributing, please keep changes scoped, use clear commit messages, preserve the local-only Blender trust boundary and make sure CI remains green.
+
+For new Blender operations, I prefer typed/structured tools over raw Python whenever possible.
 
 ---
 
@@ -506,7 +529,7 @@ For new Blender operations, prefer typed/structured tools over raw Python whenev
 
 ## License
 
-Licensed under the [MIT License](LICENSE).
+I release Nexora Forge under the [MIT License](LICENSE).
 
 <div align="center">
 
