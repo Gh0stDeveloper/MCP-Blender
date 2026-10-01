@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-type ProviderId = "openai" | "anthropic" | "deepseek" | "xai";
+type ProviderId = "openai" | "anthropic" | "deepseek" | "xai" | "custom";
 type ProviderMode = "direct" | "gateway";
 type AgentRole =
   | "coordinator"
@@ -37,7 +37,7 @@ type CatalogResponse = {
   availability: Record<ProviderId | "gateway", boolean>;
 };
 
-const providers: ProviderId[] = ["openai", "anthropic", "deepseek", "xai"];
+const providers: ProviderId[] = ["openai", "anthropic", "deepseek", "xai", "custom"];
 
 const initialAgents: Agent[] = [
   {
@@ -92,6 +92,7 @@ function modelFor(
   provider: ProviderId,
   mode: ProviderMode,
 ): string | undefined {
+  if (provider === "custom") return "custom-model";
   const item = catalog.find((entry) => entry.provider === provider);
   return item ? (mode === "gateway" ? item.gatewayModel : item.directModel) : undefined;
 }
@@ -144,6 +145,7 @@ export default function CloudConsole() {
   }
 
   function modelsForAgent(agent: Agent): string[] {
+    if (agent.provider === "custom") return [agent.model || "custom-model"];
     return catalog
       .filter((entry) => entry.provider === agent.provider)
       .map((entry) => (agent.mode === "gateway" ? entry.gatewayModel : entry.directModel));
@@ -238,22 +240,24 @@ export default function CloudConsole() {
                 }
               >
                 <option value="direct">Direct provider</option>
-                <option value="gateway">AI Gateway</option>
+                <option value="gateway" disabled={agent.provider === "custom"}>
+                  AI Gateway
+                </option>
               </select>
             </label>
 
             <label>
               Model
-              <select
+              <input
+                list={`models-${agent.id}`}
                 value={agent.model}
                 onChange={(event) => patchAgent(agent.id, { model: event.target.value })}
-              >
+              />
+              <datalist id={`models-${agent.id}`}>
                 {modelsForAgent(agent).map((model) => (
-                  <option key={model} value={model}>
-                    {model}
-                  </option>
+                  <option key={model} value={model} />
                 ))}
-              </select>
+              </datalist>
             </label>
 
             <small>
