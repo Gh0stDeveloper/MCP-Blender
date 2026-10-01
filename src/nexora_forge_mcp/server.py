@@ -425,6 +425,120 @@ async def nexora_capabilities() -> dict[str, Any]:
     }
 
 
+
+@mcp.tool()
+async def create_mesh(
+    name: str,
+    vertices: list[list[float]],
+    faces: list[list[int]],
+) -> dict[str, Any]:
+    """Create an arbitrary mesh from vertices and polygon indices."""
+    if len(vertices) > 2_000_000 or len(faces) > 2_000_000:
+        raise ValueError("Mesh payload exceeds the safety limit")
+    return await _call(
+        "mesh.create",
+        {"name": name, "vertices": vertices, "faces": faces},
+        mutating=True,
+    )
+
+
+@mcp.tool()
+async def smart_uv_project(
+    object_name: str,
+    angle_limit: float = 1.1519173063162575,
+) -> dict[str, Any]:
+    """Generate a Smart UV Project for a mesh object."""
+    return await _call(
+        "uv.smart_project",
+        {"object_name": object_name, "angle_limit": angle_limit},
+        mutating=True,
+    )
+
+
+@mcp.tool()
+async def create_armature(
+    name: str = "Armature",
+    location: list[float] | None = None,
+) -> dict[str, Any]:
+    """Create an armature object for character, creature or prop rigging."""
+    return await _call(
+        "armature.create",
+        {"name": name, "location": location or [0.0, 0.0, 0.0]},
+        mutating=True,
+    )
+
+
+@mcp.tool()
+async def add_bone(
+    armature_name: str,
+    bone_name: str,
+    head: list[float],
+    tail: list[float],
+    parent: str | None = None,
+    connected: bool = False,
+) -> dict[str, Any]:
+    """Add a bone to an armature with optional parenting."""
+    return await _call(
+        "armature.add_bone",
+        {
+            "armature_name": armature_name,
+            "bone_name": bone_name,
+            "head": head,
+            "tail": tail,
+            "parent": parent,
+            "connected": connected,
+        },
+        mutating=True,
+    )
+
+
+@mcp.tool()
+async def parent_with_auto_weights(
+    mesh_name: str,
+    armature_name: str,
+) -> dict[str, Any]:
+    """Parent a mesh to an armature using Blender automatic weights."""
+    return await _call(
+        "rig.parent_auto_weights",
+        {"mesh_name": mesh_name, "armature_name": armature_name},
+        mutating=True,
+    )
+
+
+@mcp.tool()
+async def structured_blender_operation(
+    operation: str,
+    params: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Call an allowlisted structured bridge operation not covered by a dedicated tool."""
+    allowed = {
+        "system.status",
+        "scene.snapshot",
+        "scene.save",
+        "object.create_primitive",
+        "object.transform",
+        "object.delete",
+        "object.duplicate",
+        "material.create",
+        "material.assign",
+        "modifier.add",
+        "light.create",
+        "camera.create",
+        "animation.keyframe_insert",
+        "render.preview",
+        "io.import",
+        "io.export",
+        "mesh.create",
+        "uv.smart_project",
+        "armature.create",
+        "armature.add_bone",
+        "rig.parent_auto_weights",
+    }
+    if operation not in allowed:
+        raise PermissionError(f"Operation is not exposed through structured_blender_operation: {operation}")
+    read_only = {"system.status", "scene.snapshot"}
+    return await _call(operation, params or {}, mutating=operation not in read_only)
+
 def build_app() -> Any:
     raw_app = mcp.streamable_http_app(
         host=settings.gateway_host,
