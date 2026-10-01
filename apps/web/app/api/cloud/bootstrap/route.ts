@@ -27,9 +27,13 @@ export async function POST(request: Request) {
       );
     }
 
+    const organizationName = body.organizationName.trim();
+    const projectName = body.projectName.trim();
+    const ownerUserId = body.ownerUserId;
+
     const result = await transaction(async (client) => {
-      const orgSlug = slug(body.organizationSlug || body.organizationName || "");
-      const projectSlug = slug(body.projectSlug || body.projectName || "");
+      const orgSlug = slug(body.organizationSlug || organizationName);
+      const projectSlug = slug(body.projectSlug || projectName);
       if (!orgSlug || !projectSlug) throw new Error("organization/project slug is invalid");
 
       const org = await client.query<{ id: string }>(
@@ -37,7 +41,7 @@ export async function POST(request: Request) {
          values ($1,$2)
          on conflict (slug) do update set name=excluded.name
          returning id`,
-        [orgSlug, body.organizationName.trim()],
+        [orgSlug, organizationName],
       );
       const organizationId = org.rows[0].id;
 
@@ -45,7 +49,7 @@ export async function POST(request: Request) {
         `insert into organization_members (organization_id, user_id, role)
          values ($1,$2,'owner')
          on conflict (organization_id,user_id) do update set role='owner'`,
-        [organizationId, body.ownerUserId],
+        [organizationId, ownerUserId],
       );
 
       const project = await client.query<{ id: string }>(
@@ -53,7 +57,7 @@ export async function POST(request: Request) {
          values ($1,$2,$3,$4)
          on conflict (organization_id,slug) do update set name=excluded.name
          returning id`,
-        [organizationId, body.projectName.trim(), projectSlug, body.ownerUserId],
+        [organizationId, projectName, projectSlug, ownerUserId],
       );
       const projectId = project.rows[0].id;
 
@@ -62,7 +66,7 @@ export async function POST(request: Request) {
         const asset = await client.query<{ id: string }>(
           `insert into assets (project_id, asset_type, name, created_by)
            values ($1,$2,$3,$4) returning id`,
-          [projectId, body.assetType?.trim() || "generic", body.assetName.trim(), body.ownerUserId],
+          [projectId, body.assetType?.trim() || "generic", body.assetName.trim(), ownerUserId],
         );
         assetId = asset.rows[0].id;
       }
