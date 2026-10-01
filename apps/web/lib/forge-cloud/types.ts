@@ -1,4 +1,4 @@
-export type ProviderId = "openai" | "anthropic" | "deepseek" | "xai";
+export type ProviderId = "openai" | "anthropic" | "deepseek" | "xai" | "custom";
 export type ProviderMode = "direct" | "gateway";
 
 export type AgentRole =
