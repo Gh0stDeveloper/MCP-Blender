@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import uvicorn
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Image, MCPServer
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -344,6 +344,34 @@ async def render_preview(
         },
         mutating=True,
     )
+
+
+@mcp.tool()
+async def render_preview_image(
+    filename: str = "preview.png",
+    resolution_x: int = 768,
+    resolution_y: int = 768,
+    samples: int = 32,
+) -> Image:
+    """Render a preview and return it as native MCP image content for visual inspection."""
+    output_path = _guard_workspace_path(filename)
+    payload = await _call(
+        "render.preview",
+        {
+            "path": output_path,
+            "resolution_x": resolution_x,
+            "resolution_y": resolution_y,
+            "samples": samples,
+        },
+        mutating=True,
+    )
+    result = payload.get("result")
+    if not isinstance(result, dict):
+        raise RuntimeError("Blender bridge did not return render metadata")
+    rendered_path = result.get("path")
+    if not isinstance(rendered_path, str):
+        raise RuntimeError("Blender bridge did not return a render path")
+    return Image(path=rendered_path)
 
 
 @mcp.tool()
