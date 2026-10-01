@@ -74,8 +74,6 @@ export default function PipelineConsole() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const authHeaders = cloudToken ? { Authorization: `Bearer ${cloudToken}` } : {};
-
   function ensureOwnerId() {
     if (!ownerUserId) {
       setOwnerUserId(crypto.randomUUID());
@@ -83,13 +81,16 @@ export default function PipelineConsole() {
   }
 
   async function api(path: string, init: RequestInit = {}) {
+    const headers = new Headers(init.headers);
+    if (init.body && !headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json");
+    }
+    if (cloudToken) {
+      headers.set("Authorization", `Bearer ${cloudToken}`);
+    }
     const response = await fetch(path, {
       ...init,
-      headers: {
-        ...(init.body ? { "Content-Type": "application/json" } : {}),
-        ...authHeaders,
-        ...(init.headers ?? {}),
-      },
+      headers,
       cache: "no-store",
     });
     const payload = await response.json();
