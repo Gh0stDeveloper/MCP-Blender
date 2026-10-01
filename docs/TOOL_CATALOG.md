@@ -8,7 +8,7 @@ Look development: create_material, assign_material, create_light, create_camera.
 
 Rigging and animation: create_armature, add_bone, parent_with_auto_weights, keyframe_insert.
 
-Files and delivery: scene_save, scene_new, import_asset, export_asset, render_preview.
+Files and delivery: scene_save, scene_new, import_asset, export_asset, render_preview, render_preview_image. The image variant returns native MCP image content so an AI client can visually inspect the Blender result.
 
 Orchestration: batch_execute, structured_blender_operation, and the separately gated blender_execute_python.
 
