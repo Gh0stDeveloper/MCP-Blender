@@ -436,7 +436,7 @@ export async function reviewJob(input: {
           job.asset_id,
           artifact.rows[0].storage_key,
           artifact.rows[0].checksum_sha256,
-          input.reviewerUserId,
+          job.requested_by,
           input.jobId,
         ],
       );
