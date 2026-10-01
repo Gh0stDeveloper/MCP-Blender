@@ -289,22 +289,52 @@ export async function finishJobExecution(
   leaseToken: string,
   summary: string,
   operationResults: unknown,
-): Promise<void> {
-  await transaction(async (client) => {
-    const result = await client.query<{ asset_id: string | null; require_approval: boolean }>(
+): Promise<"awaiting_approval" | "completed"> {
+  return transaction(async (client) => {
+    const result = await client.query<{
+      asset_id: string | null;
+      requested_by: string;
+      require_approval: boolean;
+    }>(
       `update jobs
           set status=case when require_approval then 'awaiting_approval' else 'completed' end,
               result_summary=$4,
               operation_results=$5::jsonb,
+              executed_by_device_id=$2,
+              leased_by_device_id=null,
               lease_expires_at=null,
               lease_token_hash=null,
               finished_at=case when require_approval then null else now() end
         where id=$1 and leased_by_device_id=$2 and lease_token_hash=$3 and status='running'
-        returning asset_id, require_approval`,
+        returning asset_id, requested_by, require_approval`,
       [jobId, device.id, hashToken(leaseToken), summary, JSON.stringify(operationResults)],
     );
-    if (!result.rows[0]) throw new Error("job lease is invalid or expired");
-    await client.query("update devices set status='online', last_seen_at=now() where id=$1", [device.id]);
+    const job = result.rows[0];
+    if (!job) throw new Error("job lease is invalid or expired");
+
+    if (job.asset_id) {
+      if (job.require_approval) {
+        const reviewLockSeconds = Math.max(
+          300,
+          Math.min(Number(process.env.NEXORA_REVIEW_LOCK_SECONDS ?? "86400"), 604800),
+        );
+        await client.query(
+          `update asset_locks
+              set device_id=null,
+                  lease_expires_at=now() + ($3 || ' seconds')::interval
+            where asset_id=$1 and locked_by=$2`,
+          [job.asset_id, job.requested_by, reviewLockSeconds],
+        );
+      } else {
+        await client.query("delete from asset_locks where asset_id=$1", [job.asset_id]);
+      }
+    }
+
+    await client.query(
+      "update devices set status='online', last_seen_at=now() where id=$1",
+      [device.id],
+    );
+    return job.require_approval ? "awaiting_approval" : "completed";
   });
 }
 
@@ -318,7 +348,8 @@ export async function failJobExecution(
     const result = await client.query<{ asset_id: string | null }>(
       `update jobs
           set status='failed', error_message=$4, lease_expires_at=null,
-              lease_token_hash=null, finished_at=now()
+              lease_token_hash=null, executed_by_device_id=$2,
+              leased_by_device_id=null, finished_at=now()
         where id=$1 and leased_by_device_id=$2 and lease_token_hash=$3 and status='running'
         returning asset_id`,
       [jobId, device.id, hashToken(leaseToken), error.slice(0, 4000)],
