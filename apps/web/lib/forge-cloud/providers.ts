@@ -8,6 +8,7 @@ function requiredKey(provider: ProviderId): string {
     anthropic: process.env.ANTHROPIC_API_KEY,
     deepseek: process.env.DEEPSEEK_API_KEY,
     xai: process.env.XAI_API_KEY,
+    custom: process.env.NEXORA_CUSTOM_AI_API_KEY,
   };
   const key = keys[provider];
   if (!key) {
@@ -172,6 +173,34 @@ async function callAnthropic(
   return text;
 }
 
+async function callCustom(
+  model: string,
+  system: string,
+  prompt: string,
+  maxOutputTokens: number,
+): Promise<string> {
+  const baseUrl = process.env.NEXORA_CUSTOM_AI_BASE_URL?.replace(/\/$/, "");
+  if (!baseUrl) throw new Error("NEXORA_CUSTOM_AI_BASE_URL is not configured");
+  const payload = await requestJson(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${requiredKey("custom")}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: prompt },
+      ],
+      max_tokens: maxOutputTokens,
+    }),
+  });
+  const text = textFromChat(payload);
+  if (!text) throw new Error("Custom provider returned no text output");
+  return text;
+}
+
 export async function invokeAgent(
   agent: CloudAgentConfig,
   system: string,
@@ -186,6 +215,9 @@ export async function invokeAgent(
   }
   if (agent.provider === "deepseek") {
     return callDeepSeek(agent.model, system, prompt, maxOutputTokens);
+  }
+  if (agent.provider === "custom") {
+    return callCustom(agent.model, system, prompt, maxOutputTokens);
   }
   return callAnthropic(agent.model, system, prompt, maxOutputTokens);
 }
