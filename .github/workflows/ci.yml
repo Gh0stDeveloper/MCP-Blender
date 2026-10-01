@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "feature/**"]
   pull_request:
 
 permissions:
@@ -27,8 +27,8 @@ jobs:
         run: uv run mypy
       - name: Tests
         run: uv run pytest
-      - name: Compile Blender extension
-        run: python -m compileall -q blender_extension
+      - name: Compile Python surfaces
+        run: python -m compileall -q blender_extension examples
 
   web:
     name: SaaS web

@@ -46,7 +46,7 @@ The public MCP process and Blender are intentionally separated. Blender only lis
 - Batch execution for lower-latency multi-step generation.
 - Optional unrestricted Blender Python execution, **disabled by default**.
 - Permission profiles: `safe`, `standard`, `unrestricted`.
-- Bearer-token protection at the public gateway and a separate bridge secret for Blender.
+- Three auth modes: loopback-only Secure MCP Tunnel, static Bearer, and OAuth 2.1 Resource Server.\n- OAuth scope enforcement for read/write/raw-Python capabilities.\n- A separate bridge secret protects the local Blender hop.
 - Audit log hooks and request IDs.
 - Cloudflare Tunnel scripts/config examples.
 - ngrok fallback scripts/config examples.
@@ -116,6 +116,17 @@ ngrok http 8765
 ```
 
 Use the gateway bearer token and, where available, provider edge authentication/rate limits.
+
+## OpenAI connection modes
+
+| Use case | Auth mode | Connection |
+| --- | --- | --- |
+| ChatGPT Business/Enterprise/Edu + private Blender | `local` | Secure MCP Tunnel |
+| Responses API + private Blender | `local` | `tunnel_id` |
+| Responses API + direct remote MCP | `static` or `oauth` | `server_url` + authorization |
+| Stable public MCP | `oauth` | HTTPS + OAuth 2.1 |
+
+See `docs/OPENAI_COMPATIBILITY.md`, `docs/OAUTH.md`, and `docs/PUBLIC_DISTRIBUTION.md`.
 
 ## Security model
 
