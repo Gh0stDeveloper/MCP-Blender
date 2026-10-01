@@ -26,7 +26,9 @@ export default function Home() {
         <Link className="brand" href="/">NEXORA <span>FORGE</span></Link>
         <nav>
           <a href="#capabilities">Capabilities</a>
+          <Link href="/cloud">Cloud</Link>
           <a href="#security">Security</a>
+          <a href="#credits">Credits</a>
           <Link href="/dashboard">Dashboard</Link>
         </nav>
       </header>
@@ -82,9 +84,37 @@ export default function Home() {
         </p>
       </section>
 
+      <section id="credits" className="credits shell">
+        <div>
+          <span className="pill">PROJECT & CONTACT</span>
+          <h2>Built and maintained by Ghost Developer.</h2>
+          <p>
+            Open-source development, Blender automation and AI-native production workflows.
+          </p>
+        </div>
+        <div className="creditLinks">
+          <a href="https://github.com/Gh0stDeveloper" target="_blank" rel="noreferrer">
+            <span>Owner</span><strong>Ghost Developer</strong>
+          </a>
+          <a href="https://github.com/Gh0stDeveloper/MCP-Blender" target="_blank" rel="noreferrer">
+            <span>Source</span><strong>GitHub repository</strong>
+          </a>
+          <a href="mailto:ghostnexora@gmail.com">
+            <span>Email</span><strong>ghostnexora@gmail.com</strong>
+          </a>
+          <a href="https://t.me/Gh0stDeveloper" target="_blank" rel="noreferrer">
+            <span>Telegram</span><strong>@Gh0stDeveloper</strong>
+          </a>
+        </div>
+      </section>
+
       <footer className="shell">
         <div className="brand">NEXORA <span>FORGE</span></div>
-        <p>AI-native 3D production for Blender.</p>
+        <div className="footerLinks">
+          <Link href="/cloud">Forge Cloud</Link>
+          <Link href="/cloud/pipeline">Pipeline</Link>
+          <a href="https://github.com/Gh0stDeveloper/MCP-Blender">GitHub</a>
+        </div>
       </footer>
     </main>
   );
