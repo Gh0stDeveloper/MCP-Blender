@@ -19,7 +19,7 @@ A secure MCP automation platform I built to connect modern AI systems with Blend
 [![Cloudflare](https://img.shields.io/badge/Cloudflare-Tunnel-F38020?style=flat-square&logo=cloudflare&logoColor=white)](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
 [![Vercel](https://img.shields.io/badge/Vercel-AI_Gateway-000000?style=flat-square&logo=vercel&logoColor=white)](https://vercel.com/ai-gateway)
 
-[Website](apps/web) · [Architecture](docs/ARCHITECTURE.md) · [Security](docs/SECURITY.md) · [Cloud](docs/SAAS.md) · [Production Pipeline](docs/PRODUCTION_PIPELINE.md) · [Tool Catalog](docs/TOOL_CATALOG.md)
+[Website](apps/web) · [Architecture](docs/ARCHITECTURE.md) · [Security](docs/SECURITY.md) · [Cloud](docs/CLOUD.md) · [Production Pipeline](docs/PRODUCTION_PIPELINE.md) · [Tool Catalog](docs/TOOL_CATALOG.md)
 
 </div>
 
@@ -452,43 +452,22 @@ For production I recommend:
 6. Use private object storage buckets.
 7. Keep raw Python disabled unless it is explicitly needed.
 8. Rotate secrets after accidental disclosure.
-9. Put Cloud behind a real account/organization identity layer before offering a public multi-tenant hosted service.
+9. Keep Forge Cloud on a trusted local/private network unless you deliberately add your own secure remote-access layer.
 
 See [docs/SECURITY.md](docs/SECURITY.md).
 
 ---
 
-## Hosted SaaS additions
+## Local-first scope
 
-The self-hosted MCP, Cloud control plane, Device Agent, asset locks, versioning, storage, previews and approval pipeline are already part of the project.
+I am keeping Nexora Forge focused on local and privately self-hosted use.
 
-There are two pieces I intentionally leave as **hosted SaaS deployment layers** rather than hard-coding them into the open-source core:
+The MCP gateway, Blender bridge, Forge Cloud control plane, Device Agent, asset locking, versioning, storage, previews, multi-agent orchestration and human approval pipeline are designed to run under the control of the user or team operating the Blender workstations.
 
-### Public account login and billing
+I am not treating account subscriptions, public billing, hosted user acquisition or a managed multi-tenant service as part of the current project scope.
 
-A public commercial deployment still needs a real user-facing identity and billing layer.
+For AI provider credentials, local/private installations can use server-side environment variables. The existing `secret_ref` field remains useful for installations that choose to connect their own private secret manager, but Nexora Forge does not require a hosted vault service to operate.
 
-That means integrating whichever provider the deployment owner chooses for:
-
-- account signup/login;
-- passwordless, OAuth or enterprise SSO;
-- organization invitations and identity mapping;
-- subscription plans;
-- quotas and metering;
-- invoices/payments;
-- account suspension and lifecycle management.
-
-I do not couple the core project to one authentication or billing vendor because self-hosted users may not need billing at all, while hosted deployments may prefer completely different providers.
-
-### Secret-vault-backed per-organization BYOK
-
-The Cloud schema already uses a `secret_ref` concept instead of a plaintext provider-key field.
-
-For a public multi-tenant SaaS, I still recommend connecting that reference to a dedicated encrypted secret manager or KMS so every organization can bring its own OpenAI, Anthropic, DeepSeek, xAI or compatible provider credentials without exposing raw keys to the application database or browser.
-
-In other words, BYOK support is prepared at the data-model level, but the actual vault implementation is deployment-specific because different installations may use AWS Secrets Manager, GCP Secret Manager, Azure Key Vault, HashiCorp Vault, another KMS-backed service or a private internal vault.
-
-Neither of these two layers blocks the local/self-hosted production pipeline. They matter when Nexora Forge is deployed as a public multi-user commercial service.
 
 ---
 
@@ -497,7 +476,7 @@ Neither of these two layers blocks the local/self-hosted production pipeline. Th
 - [Architecture](docs/ARCHITECTURE.md)
 - [Security](docs/SECURITY.md)
 - [Tool catalog](docs/TOOL_CATALOG.md)
-- [Forge Cloud](docs/SAAS.md)
+- [Forge Cloud](docs/CLOUD.md)
 - [Multi-agent production](docs/MULTI_AGENT.md)
 - [Production pipeline](docs/PRODUCTION_PIPELINE.md)
 - [OpenAI compatibility](docs/OPENAI_COMPATIBILITY.md)
