@@ -71,6 +71,7 @@ export function providerAvailability(): Record<ProviderId | "gateway", boolean> 
     anthropic: Boolean(process.env.ANTHROPIC_API_KEY),
     deepseek: Boolean(process.env.DEEPSEEK_API_KEY),
     xai: Boolean(process.env.XAI_API_KEY),
+    custom: Boolean(process.env.NEXORA_CUSTOM_AI_API_KEY && process.env.NEXORA_CUSTOM_AI_BASE_URL),
     gateway: Boolean(process.env.AI_GATEWAY_API_KEY),
   };
 }
