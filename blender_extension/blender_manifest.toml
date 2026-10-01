@@ -1,0 +1,15 @@
+schema_version = "1.0.0"
+
+id = "nexora_forge_mcp"
+version = "0.1.0"
+name = "Nexora Forge MCP"
+tagline = "Secure AI-native Blender production bridge"
+maintainer = "Ghost Developer"
+type = "add-on"
+tags = ["Pipeline", "Development", "3D View"]
+blender_version_min = "4.5.0"
+license = ["SPDX:MIT"]
+
+[permissions]
+network = "Listens only on localhost for the Nexora Forge MCP gateway."
+files = "Reads and writes project assets inside the configured workspace."
