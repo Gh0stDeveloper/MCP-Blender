@@ -105,6 +105,7 @@ export async function redeemDevicePairingCode(input: {
   organizationId: string;
   ownerUserId: string;
   token: string;
+  memberToken: string;
 }> {
   return transaction(async (client) => {
     const pair = await client.query<{
@@ -125,6 +126,7 @@ export async function redeemDevicePairingCode(input: {
     if (!row) throw new Error("pairing_code_invalid_or_expired");
 
     const token = issueDeviceToken();
+    const memberToken = issueMemberToken();
     const enrollmentPublicId = `nfd_${randomUUID().replaceAll("-", "").slice(0, 24)}`;
     const device = await client.query<{ id: string }>(
       `insert into devices (
@@ -141,6 +143,12 @@ export async function redeemDevicePairingCode(input: {
       ],
     );
     await client.query(
+      `update organization_members
+          set auth_token_hash=$3, token_created_at=now()
+        where organization_id=$1 and user_id=$2`,
+      [row.organization_id, row.owner_user_id, hashToken(memberToken)],
+    );
+    await client.query(
       "update device_pairing_codes set used_at=now() where id=$1",
       [row.id],
     );
@@ -149,6 +157,7 @@ export async function redeemDevicePairingCode(input: {
       organizationId: row.organization_id,
       ownerUserId: row.owner_user_id,
       token,
+      memberToken,
     };
   });
 }
