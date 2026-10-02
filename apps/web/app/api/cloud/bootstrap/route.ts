@@ -48,15 +48,20 @@ export async function POST(request: Request) {
       const ownerToken = issueMemberToken();
       await client.query(
         `insert into organization_members (
-           organization_id, user_id, role, display_name, auth_token_hash, token_created_at
+           organization_id, user_id, role, display_name, token_created_at
          )
-         values ($1,$2,'owner',$3,$4,now())
+         values ($1,$2,'owner',$3,now())
          on conflict (organization_id,user_id) do update
            set role='owner',
                display_name=excluded.display_name,
-               auth_token_hash=excluded.auth_token_hash,
                token_created_at=now()`,
-        [organizationId, ownerUserId, "Owner", hashToken(ownerToken)],
+        [organizationId, ownerUserId, "Owner"],
+      );
+      await client.query(
+        `insert into member_access_tokens (
+           organization_id, user_id, token_hash, label
+         ) values ($1,$2,$3,'bootstrap-owner')`,
+        [organizationId, ownerUserId, hashToken(ownerToken)],
       );
 
       const project = await client.query<{ id: string }>(
