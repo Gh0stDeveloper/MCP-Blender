@@ -11,9 +11,9 @@ import socket
 import subprocess
 import sys
 import time
+import uuid
 import urllib.error
 import urllib.request
-import uuid
 from pathlib import Path
 from typing import Any, cast
 
