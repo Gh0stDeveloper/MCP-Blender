@@ -709,7 +709,7 @@ def service_status(root: Path, name: str) -> str:
 def http_ok(url: str) -> bool:
     try:
         with urllib.request.urlopen(url, timeout=2) as response:
-            return 200 <= response.status < 500
+            return 200 <= int(response.status) < 500
     except (urllib.error.URLError, TimeoutError):
         return False
 
