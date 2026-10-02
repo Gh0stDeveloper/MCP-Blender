@@ -17,7 +17,6 @@ import uuid
 from pathlib import Path
 from typing import Any, cast
 
-
 INSTALL_VERSION = 1
 DEFAULT_WEB_PORT = 3000
 DEFAULT_DB_PORT = 55432
