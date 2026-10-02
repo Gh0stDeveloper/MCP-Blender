@@ -61,8 +61,9 @@ export async function POST(request: Request) {
     userId: body.userId ?? randomUUID(),
   });
   return Response.json({
-    ...result,
-    warning: "The member token is shown once. Store it on the member workstation.",
+    userId: result.userId,
+    role: result.role,
+    message: "Member created. Generate a one-time pairing code for the member workstation.",
   }, { status: 201 });
 }
 
