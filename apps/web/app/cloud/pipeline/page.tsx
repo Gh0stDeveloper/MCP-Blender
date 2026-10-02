@@ -5,7 +5,7 @@ import PipelineConsole from "./PipelineConsole";
 export const metadata = {
   title: "Production Pipeline | Nexora Forge Cloud",
   description:
-    "Provision projects, enroll Blender devices, queue structured jobs and follow human approval.",
+    "Manage a private team workspace, pair Blender workstations, queue jobs and review results.",
 };
 
 export default function PipelinePage() {
@@ -22,10 +22,10 @@ export default function PipelinePage() {
       </header>
       <section className="reviewHero">
         <div className="eyebrow">PRODUCTION PIPELINE</div>
-        <h1>From project setup to an approved Blender asset.</h1>
+        <h1>Private team production without manual IDs.</h1>
         <p>
-          Bootstrap the control plane, enroll a workstation, queue an allowlisted execution plan,
-          then follow the leased job through Blender, preview upload and human approval.
+          Load your member workspace, pair Blender workstations with one-time codes, queue an
+          allowlisted execution plan, then follow the leased job through preview and human approval.
         </p>
       </section>
       <PipelineConsole />
