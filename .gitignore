@@ -17,6 +17,8 @@ build/
 # Runtime
 var/
 *.log
+.nexora/
+.nexora-storage/
 
 # Blender
 *.blend1
