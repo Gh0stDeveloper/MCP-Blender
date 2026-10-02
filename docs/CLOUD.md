@@ -4,11 +4,27 @@ Nexora Forge Cloud is the optional **local/private collaboration and orchestrati
 
 It is intended to be run by the same user or team that owns the Blender workstations and project data. It is not designed as a public managed service.
 
+## Recommended setup
+
+The normal Team Host installation is now handled by the local installer:
+
+```bash
+nexora-forge setup --mode team-host
+nexora-forge start
+```
+
+The installer prepares the private PostgreSQL service, applies database migrations, creates the first organization/project, builds the web control center, configures local storage and pairs the host workstation.
+
+See [INSTALLER.md](INSTALLER.md).
+
 ## Implemented
 
 The current control plane includes:
 
 - organizations, members and projects;
+- private member access tokens;
+- enforced team roles;
+- one-time device pairing codes;
 - enrolled Blender workstations;
 - one-time Device Agent tokens stored only as hashes server-side;
 - multi-provider/multi-model Agent Teams;
@@ -23,13 +39,65 @@ The current control plane includes:
 - approve / reject / request-changes decisions;
 - immutable asset version promotion after approval;
 - authenticated artifact retrieval;
-- Cloud bootstrap and pipeline diagnostic console.
+- workspace discovery without exposing internal IDs to users.
 
 The Blender workstation remains the execution worker. Forge Cloud never exposes the local Blender bridge.
+
+## Team roles
+
+The private control plane enforces these roles:
+
+| Role | Main permissions |
+| --- | --- |
+| Owner | Full organization control |
+| Admin | Members, devices and production operations |
+| Lead | Production coordination, jobs, locks and review |
+| Artist | Production jobs, own device pairing and asset locks |
+| Reviewer | Read access plus human approval decisions |
+| Viewer | Read-only access |
+
+Role checks are performed by the API, not only by the web UI.
+
+## Adding a member
+
+An owner/admin can create a member from the CLI:
+
+```bash
+nexora-forge member add --name "Animator" --role artist
+```
+
+The command returns a short-lived one-time code:
+
+```text
+NXR-ABCD-EFGH-JKLM
+```
+
+The member joins from their own workstation:
+
+```bash
+nexora-forge setup \
+  --mode join-team \
+  --server http://TEAM-HOST:3000 \
+  --code NXR-ABCD-EFGH-JKLM
+```
+
+The pairing redemption generates both the private member token and Device Agent token automatically.
+
+## Pairing an additional workstation
+
+A member can create a pairing code for another workstation they own:
+
+```bash
+nexora-forge pair
+```
+
+Codes expire automatically and can be used only once.
 
 ## End-to-end flow
 
 ```text
+Member / Agent Team
+  ↓
 Asset lock
   ↓
 Queue job
@@ -56,7 +124,7 @@ See [PRODUCTION_PIPELINE.md](PRODUCTION_PIPELINE.md) for operational details.
 
 ## Storage
 
-For a single machine or small local setup:
+For a single machine or normal Team Host setup:
 
 ```env
 NEXORA_STORAGE_DRIVER=local
@@ -77,11 +145,13 @@ This can point to AWS S3, Cloudflare R2, MinIO or another S3-compatible service 
 
 ## Credentials
 
-AI provider credentials stay on the server side and are never returned by the model catalog endpoint.
+AI provider credentials stay on the Team Host and are never returned by the model catalog endpoint.
 
-For a simple local installation, provider keys can be supplied through environment variables.
+For a normal local installation, provider keys can be supplied through environment variables.
 
-The `provider_connections.secret_ref` field is available for teams that choose to connect their own private secret-management system, but no external vault service is required for the normal local workflow.
+The `provider_connections.secret_ref` field is available for teams that choose to connect their own private secret-management system, but no external vault service is required for the local workflow.
+
+Private member tokens use the `nfu_` prefix. Device Agent tokens use the `nfd_` prefix. Only hashes are stored in PostgreSQL.
 
 ## Network model
 
@@ -90,15 +160,26 @@ The recommended setup is:
 ```text
 Trusted local/private network
         │
-        ├── Forge Cloud / PostgreSQL / Storage
+        ├── Team Host
+        │    ├── Forge Cloud
+        │    ├── PostgreSQL
+        │    └── Storage
         │
         ├── Device Agent A → local Blender A
-        │
         ├── Device Agent B → local Blender B
-        │
         └── Device Agent C → local Blender C
 ```
 
-Device Agents make outbound requests to the control plane. Blender itself stays behind the loopback-only bridge on each workstation.
+Device Agents make outbound requests to the Team Host. Blender itself stays behind the loopback-only bridge on each workstation.
 
-If remote access is needed, use a private tunnel or another authenticated transport without changing the local Blender trust boundary.
+If remote access is needed, use a private VPN/tunnel or another authenticated transport without changing the local Blender trust boundary.
+
+## Manual database setup
+
+The installer is preferred, but custom PostgreSQL deployments can apply the migrations manually:
+
+```bash
+psql "$DATABASE_URL" -f deploy/postgres/001_forge_cloud.sql
+psql "$DATABASE_URL" -f deploy/postgres/002_production_pipeline.sql
+psql "$DATABASE_URL" -f deploy/postgres/003_local_team_access.sql
+```
