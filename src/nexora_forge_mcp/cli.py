@@ -385,23 +385,34 @@ def setup_team_host(root: Path, args: argparse.Namespace) -> None:
     project_name = args.project or input("Initial project name [Main Project]: ").strip() or "Main Project"
 
     env = base_env(root)
-    postgres_password = secrets.token_urlsafe(32)
+    existing_env = read_env(root / ".env")
+    if existing_env and not args.force:
+        raise SystemExit(".env already exists. Re-run with --force to reconfigure it.")
+    if existing_env:
+        env.update(existing_env)
+
+    postgres_password = env.get("NEXORA_POSTGRES_PASSWORD") or secrets.token_urlsafe(32)
     env.update({
-        "NEXORA_CLOUD_API_TOKEN": secrets.token_urlsafe(48),
+        "NEXORA_CLOUD_API_TOKEN": env.get("NEXORA_CLOUD_API_TOKEN") or secrets.token_urlsafe(48),
         "NEXORA_POSTGRES_PASSWORD": postgres_password,
-        "DATABASE_URL": f"postgresql://nexora:{postgres_password}@127.0.0.1:{DEFAULT_DB_PORT}/nexora_forge",
-        "NEXORA_DB_SSL": "false",
-        "NEXORA_DB_POOL_MAX": "10",
-        "NEXORA_JOB_LEASE_SECONDS": "900",
-        "NEXORA_REVIEW_LOCK_SECONDS": "86400",
-        "NEXORA_MAX_ARTIFACT_BYTES": str(100 * 1024 * 1024),
-        "NEXORA_STORAGE_DRIVER": "local",
-        "NEXORA_STORAGE_ROOT": str(root / ".nexora-storage"),
-        "NEXORA_WEB_HOST": "0.0.0.0",
-        "NEXORA_WEB_PORT": str(DEFAULT_WEB_PORT),
+        "DATABASE_URL": env.get("DATABASE_URL")
+        or f"postgresql://nexora:{postgres_password}@127.0.0.1:{DEFAULT_DB_PORT}/nexora_forge",
+        "NEXORA_DB_SSL": env.get("NEXORA_DB_SSL", "false"),
+        "NEXORA_DB_POOL_MAX": env.get("NEXORA_DB_POOL_MAX", "10"),
+        "NEXORA_JOB_LEASE_SECONDS": env.get("NEXORA_JOB_LEASE_SECONDS", "900"),
+        "NEXORA_REVIEW_LOCK_SECONDS": env.get("NEXORA_REVIEW_LOCK_SECONDS", "86400"),
+        "NEXORA_MAX_ARTIFACT_BYTES": env.get(
+            "NEXORA_MAX_ARTIFACT_BYTES",
+            str(100 * 1024 * 1024),
+        ),
+        "NEXORA_STORAGE_DRIVER": env.get("NEXORA_STORAGE_DRIVER", "local"),
+        "NEXORA_STORAGE_ROOT": env.get(
+            "NEXORA_STORAGE_ROOT",
+            str(root / ".nexora-storage"),
+        ),
+        "NEXORA_WEB_HOST": env.get("NEXORA_WEB_HOST", "0.0.0.0"),
+        "NEXORA_WEB_PORT": env.get("NEXORA_WEB_PORT", str(DEFAULT_WEB_PORT)),
     })
-    if (root / ".env").exists() and not args.force:
-        raise SystemExit(".env already exists. Re-run with --force to replace it.")
     write_env(root / ".env", env)
     process_env = merged_process_env(root)
     start_postgres(root, process_env)
