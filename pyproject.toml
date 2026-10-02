@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Ghost Developer" }]
-keywords = ["mcp", "blender", "3d", "ai", "automation", "saas"]
+keywords = ["mcp", "blender", "3d", "ai", "automation", "self-hosted"]
 dependencies = [
   "mcp>=2.0,<3",
   "httpx>=0.28,<1",
@@ -30,6 +30,7 @@ dev = [
 
 [project.scripts]
 nexora-forge-mcp = "nexora_forge_mcp.server:main"
+nexora-forge = "nexora_forge_mcp.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/nexora_forge_mcp"]
