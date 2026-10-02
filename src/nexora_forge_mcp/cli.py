@@ -383,6 +383,10 @@ def setup_team_host(root: Path, args: argparse.Namespace) -> None:
         or "Nexora Team"
     )
     project_name = args.project or input("Initial project name [Main Project]: ").strip() or "Main Project"
+    join_url = (
+        args.join_url
+        or f"http://{socket.gethostname()}:{DEFAULT_WEB_PORT}"
+    ).rstrip("/")
 
     env = base_env(root)
     existing_env = read_env(root / ".env")
@@ -431,6 +435,7 @@ def setup_team_host(root: Path, args: argparse.Namespace) -> None:
         "mode": "team-host",
         "created_at": int(time.time()),
         "cloud_url": f"http://127.0.0.1:{DEFAULT_WEB_PORT}",
+        "join_url": join_url,
         "organization_name": organization_name,
         "project_name": project_name,
         **seeded,
@@ -439,6 +444,7 @@ def setup_team_host(root: Path, args: argparse.Namespace) -> None:
     print("\nTeam Host setup is ready.")
     print(f"Organization: {organization_name}")
     print(f"Project: {project_name}")
+    print(f"Team join URL: {join_url}")
     print("Run: nexora-forge start")
     print("Private owner token (also stored locally in .nexora/install.json):")
     print(f"  {seeded['member_token']}")
@@ -792,6 +798,7 @@ def cmd_pair(args: argparse.Namespace) -> None:
     config = load_config(root)
     token = config.get("member_token")
     cloud_url = config.get("cloud_url")
+    join_url = config.get("join_url", cloud_url)
     if not isinstance(token, str) or not isinstance(cloud_url, str):
         raise SystemExit("This installation does not have an owner/member token.")
     payload: dict[str, Any] = {"ttlSeconds": args.ttl}
@@ -807,7 +814,8 @@ def cmd_pair(args: argparse.Namespace) -> None:
     print(f"  {code}")
     print(f"Expires: {expires}")
     print("\nOn the other workstation run:")
-    print(f"  nexora-forge setup --mode join-team --server {cloud_url} --code {code}")
+    shared_url = join_url if isinstance(join_url, str) else cloud_url
+    print(f"  nexora-forge setup --mode join-team --server {shared_url} --code {code}")
 
 
 def cmd_member_add(args: argparse.Namespace) -> None:
@@ -833,10 +841,60 @@ def cmd_member_add(args: argparse.Namespace) -> None:
         token=token,
         payload={"ownerUserId": user_id, "ttlSeconds": 900},
     )
+    code = pair.get("code")
     print("One-time setup code:")
-    print(f"  {pair.get('code')}")
+    print(f"  {code}")
     print(f"Expires: {pair.get('expiresAt')}")
-    print("The member only needs the team URL and this pairing code.")
+    join_url = config.get("join_url", cloud_url)
+    if isinstance(join_url, str) and isinstance(code, str):
+        print("Member setup command:")
+        print(
+            "  nexora-forge setup --mode join-team "
+            f"--server {join_url} --code {code}"
+        )
+
+
+def cmd_member_list(_args: argparse.Namespace) -> None:
+    root = project_root()
+    config = load_config(root)
+    token = config.get("member_token")
+    cloud_url = config.get("cloud_url")
+    if not isinstance(token, str) or not isinstance(cloud_url, str):
+        raise SystemExit("This installation does not have an owner/admin member token.")
+    result = json_request(
+        cloud_url.rstrip("/") + "/api/cloud/team/members",
+        token=token,
+    )
+    members = result.get("members")
+    if not isinstance(members, list):
+        raise SystemExit("Team server returned an invalid member list.")
+    for item in members:
+        if not isinstance(item, dict):
+            continue
+        print(
+            f"{item.get('user_id')}  "
+            f"{item.get('role')}  "
+            f"{item.get('display_name') or ''}"
+        )
+
+
+def cmd_member_remove(args: argparse.Namespace) -> None:
+    root = project_root()
+    config = load_config(root)
+    token = config.get("member_token")
+    cloud_url = config.get("cloud_url")
+    if not isinstance(token, str) or not isinstance(cloud_url, str):
+        raise SystemExit("This installation does not have an owner/admin member token.")
+    result = json_request(
+        cloud_url.rstrip("/") + "/api/cloud/team/members",
+        method="DELETE",
+        token=token,
+        payload={"userId": args.user_id},
+    )
+    if result.get("ok") is True:
+        print(f"Member removed: {args.user_id}")
+    else:
+        raise SystemExit("Member could not be removed. The owner account cannot be deleted.")
 
 
 
@@ -862,6 +920,10 @@ def build_parser() -> argparse.ArgumentParser:
     setup.add_argument("--owner-name")
     setup.add_argument("--organization")
     setup.add_argument("--project")
+    setup.add_argument(
+        "--join-url",
+        help="Private URL other team workstations use to reach this Team Host.",
+    )
     setup.add_argument("--server")
     setup.add_argument("--code")
     setup.add_argument("--device-name")
@@ -901,6 +963,13 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["admin", "lead", "artist", "reviewer", "viewer"],
     )
     member_add.set_defaults(func=cmd_member_add)
+
+    member_list = member_sub.add_parser("list", help="List private team members.")
+    member_list.set_defaults(func=cmd_member_list)
+
+    member_remove = member_sub.add_parser("remove", help="Remove a non-owner team member.")
+    member_remove.add_argument("--user-id", required=True)
+    member_remove.set_defaults(func=cmd_member_remove)
 
     return parser
 
