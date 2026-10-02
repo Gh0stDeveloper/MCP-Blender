@@ -62,10 +62,13 @@ def load_config(root: Path) -> dict[str, Any]:
 
 
 def save_config(root: Path, value: dict[str, Any]) -> None:
-    config_path(root).write_text(
+    path = config_path(root)
+    path.write_text(
         json.dumps(value, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    if os.name != "nt":
+        path.chmod(0o600)
 
 
 def read_env(path: Path) -> dict[str, str]:
@@ -84,6 +87,8 @@ def read_env(path: Path) -> dict[str, str]:
 def write_env(path: Path, values: dict[str, str]) -> None:
     lines = [f"{key}={value}" for key, value in values.items()]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    if os.name != "nt":
+        path.chmod(0o600)
 
 
 def merged_process_env(root: Path) -> dict[str, str]:
@@ -409,7 +414,9 @@ def setup_team_host(root: Path, args: argparse.Namespace) -> None:
     print(f"Organization: {organization_name}")
     print(f"Project: {project_name}")
     print("Run: nexora-forge start")
-    print("Then create a device pairing code with: nexora-forge pair")
+    print("Private owner token (also stored locally in .nexora/install.json):")
+    print(f"  {seeded['member_token']}")
+    print("Create a code for an additional owner workstation with: nexora-forge pair")
     print("Other members can join with: nexora-forge setup --mode join-team")
 
 
@@ -807,6 +814,16 @@ def cmd_member_add(args: argparse.Namespace) -> None:
     print("The member only needs the team URL and this pairing code.")
 
 
+
+def cmd_token(_args: argparse.Namespace) -> None:
+    root = project_root()
+    config = load_config(root)
+    token = config.get("member_token")
+    if not isinstance(token, str) or not token:
+        raise SystemExit("No private member token is stored for this installation.")
+    print(token)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="nexora-forge",
@@ -841,6 +858,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     update = sub.add_parser("update", help="Update source, dependencies, migrations and web build.")
     update.set_defaults(func=cmd_update)
+
+    token = sub.add_parser("token", help="Print the private member/owner token stored on this machine.")
+    token.set_defaults(func=cmd_token)
 
     pair = sub.add_parser("pair", help="Create a short-lived Device Agent pairing code.")
     pair.add_argument("--ttl", type=int, default=600, help="Pairing code lifetime in seconds.")
