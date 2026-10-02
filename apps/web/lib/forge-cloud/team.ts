@@ -19,20 +19,24 @@ export async function issueOrganizationMember(input: {
   const token = issueMemberToken();
   await query(
     `insert into organization_members (
-       organization_id, user_id, role, display_name, auth_token_hash, token_created_at
-     ) values ($1,$2,$3,$4,$5,now())
+       organization_id, user_id, role, display_name, token_created_at
+     ) values ($1,$2,$3,$4,now())
      on conflict (organization_id,user_id) do update
        set role=excluded.role,
            display_name=excluded.display_name,
-           auth_token_hash=excluded.auth_token_hash,
            token_created_at=now()`,
     [
       input.organizationId,
       userId,
       input.role,
       input.displayName.trim(),
-      hashToken(token),
     ],
+  );
+  await query(
+    `insert into member_access_tokens (
+       organization_id, user_id, token_hash, label
+     ) values ($1,$2,$3,'member-setup')`,
+    [input.organizationId, userId, hashToken(token)],
   );
   return { userId, token, role: input.role };
 }
@@ -143,10 +147,15 @@ export async function redeemDevicePairingCode(input: {
       ],
     );
     await client.query(
-      `update organization_members
-          set auth_token_hash=$3, token_created_at=now()
-        where organization_id=$1 and user_id=$2`,
-      [row.organization_id, row.owner_user_id, hashToken(memberToken)],
+      `insert into member_access_tokens (
+         organization_id, user_id, token_hash, label
+       ) values ($1,$2,$3,$4)`,
+      [
+        row.organization_id,
+        row.owner_user_id,
+        hashToken(memberToken),
+        input.deviceName.trim(),
+      ],
     );
     await client.query(
       "update device_pairing_codes set used_at=now() where id=$1",
