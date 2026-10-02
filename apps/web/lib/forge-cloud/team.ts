@@ -9,14 +9,13 @@ import {
 } from "./auth";
 import { query, transaction } from "./db";
 
-export async function issueOrganizationMember(input: {
+export async function createOrganizationMember(input: {
   organizationId: string;
   displayName: string;
   role: TeamRole;
   userId?: string;
-}): Promise<{ userId: string; token: string; role: TeamRole }> {
+}): Promise<{ userId: string; role: TeamRole }> {
   const userId = input.userId ?? randomUUID();
-  const token = issueMemberToken();
   await query(
     `insert into organization_members (
        organization_id, user_id, role, display_name, token_created_at
@@ -32,13 +31,7 @@ export async function issueOrganizationMember(input: {
       input.displayName.trim(),
     ],
   );
-  await query(
-    `insert into member_access_tokens (
-       organization_id, user_id, token_hash, label
-     ) values ($1,$2,$3,'member-setup')`,
-    [input.organizationId, userId, hashToken(token)],
-  );
-  return { userId, token, role: input.role };
+  return { userId, role: input.role };
 }
 
 export async function listOrganizationMembers(organizationId: string) {
