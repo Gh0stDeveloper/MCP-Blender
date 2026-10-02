@@ -245,6 +245,9 @@ def seed_team_host(
     project_id = str(uuid.uuid4())
     owner_token = "nfu_" + secrets.token_urlsafe(36)
     owner_hash = hashlib.sha256(owner_token.encode("utf-8")).hexdigest()
+    device_token = "nfd_" + secrets.token_urlsafe(36)
+    device_hash = hashlib.sha256(device_token.encode("utf-8")).hexdigest()
+    device_id = str(uuid.uuid4())
     org_slug = slug(organization_name)
     project_slug = slug(project_name)
 
@@ -276,6 +279,20 @@ values (
   {sql_string(owner_user_id)}::uuid
 )
 on conflict (organization_id,slug) do update set name=excluded.name;
+
+insert into devices (
+  id, organization_id, owner_user_id, name, enrollment_public_id,
+  status, auth_token_hash, agent_version
+) values (
+  {sql_string(device_id)}::uuid,
+  {sql_string(organization_id)}::uuid,
+  {sql_string(owner_user_id)}::uuid,
+  {sql_string(socket.gethostname())},
+  {sql_string("nfd_" + uuid.uuid4().hex[:24])},
+  'offline',
+  {sql_string(device_hash)},
+  '0.2.0'
+);
 """
     completed = run(
         [
@@ -303,6 +320,8 @@ on conflict (organization_id,slug) do update set name=excluded.name;
         "user_id": owner_user_id,
         "project_id": project_id,
         "member_token": owner_token,
+        "device_token": device_token,
+        "device_id": device_id,
     }
 
 
@@ -437,9 +456,13 @@ def setup_join_team(root: Path, args: argparse.Namespace) -> None:
         payload={"code": code, "deviceName": device_name},
     )
     device_token = result.get("token")
+    member_token = result.get("memberToken")
     owner_user_id = result.get("ownerUserId")
     organization_id = result.get("organizationId")
-    if not all(isinstance(value, str) for value in (device_token, owner_user_id, organization_id)):
+    if not all(
+        isinstance(value, str)
+        for value in (device_token, member_token, owner_user_id, organization_id)
+    ):
         raise SystemExit("Pairing response did not contain the expected credentials.")
 
     env = base_env(root)
@@ -458,6 +481,7 @@ def setup_join_team(root: Path, args: argparse.Namespace) -> None:
         "organization_id": organization_id,
         "user_id": owner_user_id,
         "device_token": device_token,
+        "member_token": member_token,
         "device_name": device_name,
     })
     print("\nThis workstation is paired with the team.")
@@ -767,9 +791,20 @@ def cmd_member_add(args: argparse.Namespace) -> None:
         token=token,
         payload={"displayName": args.name, "role": args.role},
     )
-    print(f"Member created: {result.get('userId')} · role {result.get('role')}")
-    print("Private member token (shown once):")
-    print(f"  {result.get('token')}")
+    user_id = result.get("userId")
+    print(f"Member created: {user_id} · role {result.get('role')}")
+    if not isinstance(user_id, str):
+        raise SystemExit("Member creation did not return a user ID.")
+    pair = json_request(
+        cloud_url.rstrip("/") + "/api/cloud/pairing",
+        method="POST",
+        token=token,
+        payload={"ownerUserId": user_id, "ttlSeconds": 900},
+    )
+    print("One-time setup code:")
+    print(f"  {pair.get('code')}")
+    print(f"Expires: {pair.get('expiresAt')}")
+    print("The member only needs the team URL and this pairing code.")
 
 
 def build_parser() -> argparse.ArgumentParser:
