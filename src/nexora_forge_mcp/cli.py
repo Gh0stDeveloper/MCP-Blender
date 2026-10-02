@@ -261,18 +261,26 @@ values ({sql_string(organization_id)}::uuid, {sql_string(org_slug)}, {sql_string
 on conflict (slug) do update set name=excluded.name;
 
 insert into organization_members (
-  organization_id, user_id, role, display_name, auth_token_hash, token_created_at
+  organization_id, user_id, role, display_name, token_created_at
 ) values (
   {sql_string(organization_id)}::uuid,
   {sql_string(owner_user_id)}::uuid,
   'owner',
   {sql_string(owner_name)},
-  {sql_string(owner_hash)},
   now()
 )
 on conflict (organization_id,user_id) do update
 set role='owner', display_name=excluded.display_name,
-    auth_token_hash=excluded.auth_token_hash, token_created_at=now();
+    token_created_at=now();
+
+insert into member_access_tokens (
+  organization_id, user_id, token_hash, label
+) values (
+  {sql_string(organization_id)}::uuid,
+  {sql_string(owner_user_id)}::uuid,
+  {sql_string(owner_hash)},
+  'team-host-owner'
+);
 
 insert into projects (id, organization_id, name, slug, created_by)
 values (
