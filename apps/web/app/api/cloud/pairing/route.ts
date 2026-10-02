@@ -25,7 +25,11 @@ export async function POST(request: Request) {
   const organizationId =
     actor.kind === "member" ? actor.organizationId : body.organizationId;
   const ownerUserId =
-    actor.kind === "member" ? actor.userId : body.ownerUserId;
+    actor.kind === "member"
+      ? actorCan(actor, ["owner", "admin"]) && body.ownerUserId
+        ? body.ownerUserId
+        : actor.userId
+      : body.ownerUserId;
 
   if (!organizationId || !ownerUserId) {
     return Response.json({ error: "organizationId and ownerUserId are required" }, { status: 400 });
