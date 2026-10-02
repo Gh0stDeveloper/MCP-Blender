@@ -6,7 +6,7 @@ import {
   type TeamRole,
 } from "@/lib/forge-cloud/auth";
 import {
-  issueOrganizationMember,
+  createOrganizationMember,
   listOrganizationMembers,
   revokeOrganizationMember,
 } from "@/lib/forge-cloud/team";
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  const result = await issueOrganizationMember({
+  const result = await createOrganizationMember({
     organizationId,
     displayName: body.displayName,
     role: body.role,
