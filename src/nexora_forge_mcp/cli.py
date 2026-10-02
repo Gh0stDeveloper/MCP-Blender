@@ -244,16 +244,18 @@ def seed_team_host(
     organization_name: str,
     project_name: str,
 ) -> dict[str, str]:
-    organization_id = str(uuid.uuid4())
-    owner_user_id = str(uuid.uuid4())
-    project_id = str(uuid.uuid4())
+    org_slug = slug(organization_name)
+    project_slug = slug(project_name)
+    organization_uuid = uuid.uuid5(uuid.NAMESPACE_URL, f"nexora-forge:organization:{org_slug}")
+    organization_id = str(organization_uuid)
+    owner_uuid = uuid.uuid5(organization_uuid, f"owner:{slug(owner_name)}")
+    owner_user_id = str(owner_uuid)
+    project_id = str(uuid.uuid5(organization_uuid, f"project:{project_slug}"))
     owner_token = "nfu_" + secrets.token_urlsafe(36)
     owner_hash = hashlib.sha256(owner_token.encode("utf-8")).hexdigest()
     device_token = "nfd_" + secrets.token_urlsafe(36)
     device_hash = hashlib.sha256(device_token.encode("utf-8")).hexdigest()
-    device_id = str(uuid.uuid4())
-    org_slug = slug(organization_name)
-    project_slug = slug(project_name)
+    device_id = str(uuid.uuid5(owner_uuid, f"device:{socket.gethostname()}"))
 
     sql = f"""
 insert into organizations (id, slug, name)
@@ -304,7 +306,13 @@ insert into devices (
   'offline',
   {sql_string(device_hash)},
   '0.2.0'
-);
+)
+on conflict (id) do update
+set name=excluded.name,
+    enrollment_public_id=excluded.enrollment_public_id,
+    auth_token_hash=excluded.auth_token_hash,
+    agent_version=excluded.agent_version,
+    revoked_at=null;
 """
     completed = run(
         [
@@ -480,12 +488,11 @@ def setup_join_team(root: Path, args: argparse.Namespace) -> None:
         raise SystemExit("Pairing response did not contain the expected credentials.")
 
     env = base_env(root)
-    env["NEXORA_CLOUD_URL"] = server.rstrip("/")
-    env["NEXORA_DEVICE_TOKEN"] = cast(str, device_token)
     if (root / ".env").exists() and not args.force:
         current = read_env(root / ".env")
-        current.update(env)
-        env = current
+        env.update(current)
+    env["NEXORA_CLOUD_URL"] = server.rstrip("/")
+    env["NEXORA_DEVICE_TOKEN"] = cast(str, device_token)
     write_env(root / ".env", env)
     save_config(root, {
         "version": INSTALL_VERSION,
