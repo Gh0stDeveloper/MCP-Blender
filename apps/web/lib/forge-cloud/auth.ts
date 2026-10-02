@@ -67,19 +67,26 @@ export async function authorizeCloudRequest(request: Request): Promise<CloudActo
   const token = header.slice(7).trim();
   if (!token.startsWith("nfu_")) return null;
 
+  const tokenHash = hashToken(token);
   const rows = await query<{
     user_id: string;
     organization_id: string;
     role: TeamRole;
   }>(
-    `select user_id, organization_id, role
-       from organization_members
-      where auth_token_hash=$1
+    `select m.user_id, m.organization_id, m.role
+       from member_access_tokens t
+       join organization_members m
+         on m.organization_id=t.organization_id and m.user_id=t.user_id
+      where t.token_hash=$1 and t.revoked_at is null
       limit 1`,
-    [hashToken(token)],
+    [tokenHash],
   );
   const row = rows[0];
   if (!row) return null;
+  await query(
+    "update member_access_tokens set last_used_at=now() where token_hash=$1",
+    [tokenHash],
+  );
   return {
     kind: "member",
     userId: row.user_id,
