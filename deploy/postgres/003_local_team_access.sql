@@ -9,6 +9,24 @@ create unique index if not exists idx_org_members_auth_token_hash
   on organization_members(auth_token_hash)
   where auth_token_hash is not null;
 
+create table if not exists member_access_tokens (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null,
+  user_id uuid not null,
+  token_hash text not null unique,
+  label text not null default 'workstation',
+  last_used_at timestamptz,
+  revoked_at timestamptz,
+  created_at timestamptz not null default now(),
+  foreign key (organization_id, user_id)
+    references organization_members(organization_id, user_id)
+    on delete cascade
+);
+
+create index if not exists idx_member_access_tokens_member
+  on member_access_tokens(organization_id, user_id)
+  where revoked_at is null;
+
 create table if not exists device_pairing_codes (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references organizations(id) on delete cascade,
