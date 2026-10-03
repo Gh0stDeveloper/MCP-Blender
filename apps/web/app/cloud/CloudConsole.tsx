@@ -37,6 +37,12 @@ type CatalogResponse = {
   availability: Record<ProviderId | "gateway", boolean>;
 };
 
+type WorkspaceResponse = {
+  actor: { kind: string; userId?: string; role: string };
+  organization: { id: string; name: string; slug: string } | null;
+  projects: Array<{ id: string; name: string; slug: string }>;
+};
+
 const providers: ProviderId[] = ["openai", "anthropic", "deepseek", "xai", "custom"];
 
 const initialAgents: Agent[] = [
@@ -104,8 +110,9 @@ export default function CloudConsole() {
   const [task, setTask] = useState(
     "Create a game-ready zombie character plan with clean topology, a reusable humanoid rig, idle/walk/attack animations, PBR materials and a GLB export validation pass.",
   );
-  const [projectId, setProjectId] = useState("demo-project");
-  const [cloudToken, setCloudToken] = useState("");
+  const [projectId, setProjectId] = useState("");
+  const [memberToken, setMemberToken] = useState("");
+  const [workspace, setWorkspace] = useState<WorkspaceResponse | null>(null);
   const [dryRun, setDryRun] = useState(true);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState("");
@@ -131,12 +138,9 @@ export default function CloudConsole() {
       current.map((agent) => {
         if (agent.id !== id) return agent;
         const next = { ...agent, ...patch };
-        if (next.provider === "custom") {
-          next.mode = "direct";
-        }
+        if (next.provider === "custom") next.mode = "direct";
         if (patch.provider || patch.mode) {
-          next.model =
-            modelFor(catalog, next.provider, next.mode) ?? next.model;
+          next.model = modelFor(catalog, next.provider, next.mode) ?? next.model;
         }
         return next;
       }),
@@ -150,6 +154,29 @@ export default function CloudConsole() {
       .map((entry) => (agent.mode === "gateway" ? entry.gatewayModel : entry.directModel));
   }
 
+  async function loadWorkspace() {
+    setRunning(true);
+    setError("");
+    try {
+      const response = await fetch("/api/cloud/me", {
+        headers: memberToken ? { Authorization: `Bearer ${memberToken}` } : {},
+        cache: "no-store",
+      });
+      const data = (await response.json()) as WorkspaceResponse & { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Could not load private workspace");
+      setWorkspace(data);
+      setProjectId((current) =>
+        current && data.projects.some((project) => project.id === current)
+          ? current
+          : data.projects[0]?.id ?? "",
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not load private workspace");
+    } finally {
+      setRunning(false);
+    }
+  }
+
   async function run() {
     setRunning(true);
     setError("");
@@ -159,7 +186,7 @@ export default function CloudConsole() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(cloudToken ? { Authorization: `Bearer ${cloudToken}` } : {}),
+          ...(memberToken ? { Authorization: `Bearer ${memberToken}` } : {}),
         },
         body: JSON.stringify({
           task,
@@ -223,9 +250,7 @@ export default function CloudConsole() {
                 }
               >
                 {providers.map((provider) => (
-                  <option key={provider} value={provider}>
-                    {provider}
-                  </option>
+                  <option key={provider} value={provider}>{provider}</option>
                 ))}
               </select>
             </label>
@@ -274,10 +299,33 @@ export default function CloudConsole() {
 
       <div className="cloudRunGrid">
         <article className="panel">
-          <span className="panelLabel">PROJECT JOB</span>
+          <span className="panelLabel">PRIVATE PROJECT</span>
           <label>
-            Project ID
-            <input value={projectId} onChange={(event) => setProjectId(event.target.value)} />
+            Member / owner token
+            <input
+              type="password"
+              autoComplete="off"
+              value={memberToken}
+              onChange={(event) => setMemberToken(event.target.value)}
+              placeholder="nfu_..."
+            />
+          </label>
+          <button className="secondaryButton" disabled={running || !memberToken} onClick={loadWorkspace}>
+            Load my projects
+          </button>
+          {workspace?.organization ? (
+            <p className="workspaceIdentity">
+              {workspace.organization.name} · {workspace.actor.role}
+            </p>
+          ) : null}
+          <label>
+            Project
+            <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
+              <option value="">Select project</option>
+              {workspace?.projects.map((project) => (
+                <option key={project.id} value={project.id}>{project.name}</option>
+              ))}
+            </select>
           </label>
           <label>
             Production request
@@ -287,18 +335,12 @@ export default function CloudConsole() {
               onChange={(event) => setTask(event.target.value)}
             />
           </label>
-          <label>
-            Cloud API token
-            <input
-              type="password"
-              autoComplete="off"
-              value={cloudToken}
-              onChange={(event) => setCloudToken(event.target.value)}
-              placeholder="Required when NEXORA_CLOUD_API_TOKEN is configured"
-            />
-          </label>
-          <button className="forgeButton" disabled={running || enabledCount < 2} onClick={run}>
-            {running ? "Running agent team…" : dryRun ? "Validate team" : "Run multi-agent job"}
+          <button
+            className="forgeButton"
+            disabled={running || enabledCount < 2 || !projectId || !memberToken}
+            onClick={run}
+          >
+            {running ? "Running…" : dryRun ? "Validate team" : "Run multi-agent job"}
           </button>
           {error ? <p className="cloudError">{error}</p> : null}
         </article>
@@ -311,8 +353,8 @@ export default function CloudConsole() {
             <div className="emptyOutput">
               <strong>No run yet</strong>
               <p>
-                Dry run validates the topology without provider calls. Disable it to execute the
-                configured agent team.
+                Load your private workspace, choose a project and validate the Agent Team before
+                enabling provider calls.
               </p>
             </div>
           )}

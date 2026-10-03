@@ -32,7 +32,6 @@ type JobResponse = {
 
 export default function ReviewConsole({ jobId }: { jobId: string }) {
   const [token, setToken] = useState("");
-  const [reviewerUserId, setReviewerUserId] = useState("");
   const [notes, setNotes] = useState("");
   const [data, setData] = useState<JobResponse | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
@@ -76,10 +75,6 @@ export default function ReviewConsole({ jobId }: { jobId: string }) {
   }
 
   async function decide(decision: "approved" | "rejected" | "changes_requested") {
-    if (!reviewerUserId) {
-      setMessage("Reviewer user ID is required.");
-      return;
-    }
     setBusy(true);
     setMessage("");
     try {
@@ -89,7 +84,7 @@ export default function ReviewConsole({ jobId }: { jobId: string }) {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ reviewerUserId, decision, notes }),
+        body: JSON.stringify({ decision, notes }),
       });
       const payload = (await response.json()) as {
         error?: string;
@@ -118,7 +113,7 @@ export default function ReviewConsole({ jobId }: { jobId: string }) {
         ) : (
           <div className="reviewPlaceholder">
             <strong>No preview loaded</strong>
-            <p>Enter the Cloud token and load this job.</p>
+            <p>Enter your private member token and load this job.</p>
           </div>
         )}
       </article>
@@ -126,14 +121,16 @@ export default function ReviewConsole({ jobId }: { jobId: string }) {
       <article className="panel reviewDetails">
         <span className="panelLabel">JOB {jobId}</span>
         <label>
-          Cloud API token
-          <input type="password" value={token} onChange={(event) => setToken(event.target.value)} />
+          Member / owner token
+          <input
+            type="password"
+            autoComplete="off"
+            value={token}
+            onChange={(event) => setToken(event.target.value)}
+            placeholder="nfu_..."
+          />
         </label>
-        <label>
-          Reviewer user ID
-          <input value={reviewerUserId} onChange={(event) => setReviewerUserId(event.target.value)} />
-        </label>
-        <button className="secondaryButton" disabled={busy} onClick={load}>
+        <button className="secondaryButton" disabled={busy || !token} onClick={load}>
           {busy ? "Loading…" : "Load job"}
         </button>
 

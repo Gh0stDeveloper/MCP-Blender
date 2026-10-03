@@ -11,7 +11,7 @@ from .bridge import bridge_runtime
 bl_info = {
     "name": "Nexora Forge MCP",
     "author": "Ghost Developer",
-    "version": (0, 1, 0),
+    "version": (0, 2, 0),
     "blender": (4, 5, 0),
     "location": "View3D > Sidebar > Nexora Forge",
     "description": "Secure local bridge for AI-driven Blender automation",

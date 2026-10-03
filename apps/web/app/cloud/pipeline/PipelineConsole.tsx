@@ -1,18 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
-type BootstrapResult = {
-  organizationId: string;
-  projectId: string;
-  assetId: string | null;
-};
-
-type EnrollResult = {
-  deviceId: string;
-  enrollmentPublicId: string;
-  token: string;
+type Workspace = {
+  actor: { kind: string; userId?: string; role: string };
+  organization: { id: string; name: string; slug: string } | null;
+  projects: Array<{ id: string; name: string; slug: string }>;
+  assets: Array<{ id: string; project_id: string; name: string; asset_type: string }>;
+  devices: Array<{
+    id: string;
+    owner_user_id: string;
+    name: string;
+    status: string;
+    blender_version: string | null;
+    agent_version: string | null;
+    last_seen_at: string | null;
+  }>;
+  members: Array<{
+    user_id: string;
+    role: string;
+    display_name: string | null;
+  }>;
 };
 
 const examplePlan = JSON.stringify(
@@ -59,98 +68,109 @@ const examplePlan = JSON.stringify(
 );
 
 export default function PipelineConsole() {
-  const [cloudToken, setCloudToken] = useState("");
-  const [ownerUserId, setOwnerUserId] = useState("");
-  const [organizationName, setOrganizationName] = useState("Nexora Studio");
-  const [projectName, setProjectName] = useState("Game Production");
-  const [assetName, setAssetName] = useState("Forge Demo Asset");
-  const [bootstrap, setBootstrap] = useState<BootstrapResult | null>(null);
-  const [deviceName, setDeviceName] = useState("Blender Workstation");
-  const [device, setDevice] = useState<EnrollResult | null>(null);
-  const [plan, setPlan] = useState(examplePlan);
+  const [token, setToken] = useState("");
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [projectId, setProjectId] = useState("");
+  const [assetId, setAssetId] = useState("");
   const [task, setTask] = useState("Build the queued asset and prepare it for human review.");
+  const [plan, setPlan] = useState(examplePlan);
   const [jobId, setJobId] = useState("");
   const [jobState, setJobState] = useState("");
+  const [pairingCode, setPairingCode] = useState("");
+  const [pairingExpires, setPairingExpires] = useState("");
+  const [memberName, setMemberName] = useState("");
+  const [memberRole, setMemberRole] = useState("artist");
+  const [memberPairing, setMemberPairing] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
-  function ensureOwnerId() {
-    if (!ownerUserId) {
-      setOwnerUserId(crypto.randomUUID());
-    }
-  }
+  const projectAssets = useMemo(
+    () => workspace?.assets.filter((asset) => asset.project_id === projectId) ?? [],
+    [workspace, projectId],
+  );
+  const canManageMembers =
+    workspace?.actor.role === "owner" || workspace?.actor.role === "admin";
 
   async function api(path: string, init: RequestInit = {}) {
     const headers = new Headers(init.headers);
     if (init.body && !headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");
     }
-    if (cloudToken) {
-      headers.set("Authorization", `Bearer ${cloudToken}`);
-    }
-    const response = await fetch(path, {
-      ...init,
-      headers,
-      cache: "no-store",
-    });
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    const response = await fetch(path, { ...init, headers, cache: "no-store" });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error ?? `Request failed: ${response.status}`);
     return payload;
   }
 
-  async function bootstrapProject() {
+  async function loadWorkspace() {
     setBusy(true);
     setMessage("");
     try {
-      const userId = ownerUserId || crypto.randomUUID();
-      setOwnerUserId(userId);
-      const result = (await api("/api/cloud/bootstrap", {
-        method: "POST",
-        body: JSON.stringify({
-          ownerUserId: userId,
-          organizationName,
-          projectName,
-          assetName,
-          assetType: "demo",
-        }),
-      })) as BootstrapResult;
-      setBootstrap(result);
-      setMessage("Workspace, project and asset are ready.");
+      const result = (await api("/api/cloud/me")) as Workspace;
+      setWorkspace(result);
+      const firstProject = result.projects[0]?.id ?? "";
+      setProjectId((current) =>
+        current && result.projects.some((project) => project.id === current)
+          ? current
+          : firstProject,
+      );
+      setMessage("Private workspace loaded.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Bootstrap failed");
+      setMessage(error instanceof Error ? error.message : "Could not load workspace");
     } finally {
       setBusy(false);
     }
   }
 
-  async function enroll() {
-    if (!bootstrap) {
-      setMessage("Bootstrap the project first.");
+  async function createMyPairingCode() {
+    setBusy(true);
+    setMessage("");
+    try {
+      const result = (await api("/api/cloud/pairing", {
+        method: "POST",
+        body: JSON.stringify({ ttlSeconds: 900 }),
+      })) as { code: string; expiresAt: string };
+      setPairingCode(result.code);
+      setPairingExpires(result.expiresAt);
+      setMessage("One-time device pairing code created.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not create pairing code");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function addMember() {
+    if (!memberName.trim()) {
+      setMessage("Member name is required.");
       return;
     }
     setBusy(true);
     setMessage("");
+    setMemberPairing("");
     try {
-      const result = (await api("/api/cloud/devices/enroll", {
+      const member = (await api("/api/cloud/team/members", {
         method: "POST",
-        body: JSON.stringify({
-          organizationId: bootstrap.organizationId,
-          ownerUserId,
-          name: deviceName,
-        }),
-      })) as EnrollResult;
-      setDevice(result);
-      setMessage("Device enrolled. Save the device token now; it is returned only at enrollment.");
+        body: JSON.stringify({ displayName: memberName, role: memberRole }),
+      })) as { userId: string; role: string };
+      const pair = (await api("/api/cloud/pairing", {
+        method: "POST",
+        body: JSON.stringify({ ownerUserId: member.userId, ttlSeconds: 900 }),
+      })) as { code: string; expiresAt: string };
+      setMemberPairing(pair.code);
+      setMessage(`${memberName} is ready to join as ${member.role}.`);
+      await loadWorkspace();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Enrollment failed");
+      setMessage(error instanceof Error ? error.message : "Could not add member");
     } finally {
       setBusy(false);
     }
   }
 
   async function enqueue() {
-    if (!bootstrap) {
-      setMessage("Bootstrap the project first.");
+    if (!projectId) {
+      setMessage("Select a project first.");
       return;
     }
     let executionPlan: unknown;
@@ -160,23 +180,22 @@ export default function PipelineConsole() {
       setMessage("Execution plan is not valid JSON.");
       return;
     }
+
     setBusy(true);
     setMessage("");
     try {
       const result = (await api("/api/cloud/jobs", {
         method: "POST",
         body: JSON.stringify({
-          projectId: bootstrap.projectId,
-          requestedBy: ownerUserId,
-          assetId: bootstrap.assetId,
-          targetDeviceId: device?.deviceId ?? null,
+          projectId,
+          assetId: assetId || null,
           task,
           executionPlan,
           requireApproval: true,
         }),
       })) as { jobId: string };
       setJobId(result.jobId);
-      setMessage("Job queued. Start the Device Agent on the enrolled workstation.");
+      setMessage("Job queued for an eligible Blender workstation.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Job enqueue failed");
     } finally {
@@ -200,50 +219,125 @@ export default function PipelineConsole() {
   return (
     <section className="pipelineConsole">
       <article className="panel pipelineStep">
-        <span className="panelLabel">01 · CONTROL PLANE</span>
+        <span className="panelLabel">01 · PRIVATE WORKSPACE</span>
         <label>
-          Cloud API token
-          <input type="password" value={cloudToken} onChange={(e) => setCloudToken(e.target.value)} />
+          Member / owner token
+          <input
+            type="password"
+            autoComplete="off"
+            value={token}
+            onChange={(event) => setToken(event.target.value)}
+            placeholder="nfu_..."
+          />
         </label>
-        <label>
-          Owner user UUID
-          <div className="inlineField">
-            <input value={ownerUserId} onChange={(e) => setOwnerUserId(e.target.value)} />
-            <button type="button" onClick={ensureOwnerId}>Generate</button>
-          </div>
-        </label>
-        <label>Organization<input value={organizationName} onChange={(e) => setOrganizationName(e.target.value)} /></label>
-        <label>Project<input value={projectName} onChange={(e) => setProjectName(e.target.value)} /></label>
-        <label>Initial asset<input value={assetName} onChange={(e) => setAssetName(e.target.value)} /></label>
-        <button className="forgeButton" disabled={busy} onClick={bootstrapProject}>Bootstrap project</button>
-        {bootstrap ? <pre>{JSON.stringify(bootstrap, null, 2)}</pre> : null}
-      </article>
-
-      <article className="panel pipelineStep">
-        <span className="panelLabel">02 · DEVICE ENROLLMENT</span>
-        <label>Device name<input value={deviceName} onChange={(e) => setDeviceName(e.target.value)} /></label>
-        <button className="forgeButton" disabled={busy || !bootstrap} onClick={enroll}>Enroll Blender workstation</button>
-        {device ? (
-          <div className="deviceSecret">
-            <strong>Save this token once</strong>
-            <code>{device.token}</code>
-            <p>Set it as <code>NEXORA_DEVICE_TOKEN</code> on the workstation.</p>
+        <button className="forgeButton" disabled={busy || !token} onClick={loadWorkspace}>
+          Load my workspace
+        </button>
+        {workspace?.organization ? (
+          <div className="reviewMeta">
+            <div><span>Team</span><strong>{workspace.organization.name}</strong></div>
+            <div><span>Role</span><strong>{workspace.actor.role}</strong></div>
+            <div><span>Projects</span><strong>{workspace.projects.length}</strong></div>
+            <div><span>Devices</span><strong>{workspace.devices.length}</strong></div>
           </div>
         ) : null}
       </article>
 
+      <article className="panel pipelineStep">
+        <span className="panelLabel">02 · PAIR A BLENDER DEVICE</span>
+        <p>Create a short-lived code for another Blender workstation owned by this member.</p>
+        <button className="forgeButton" disabled={busy || !workspace} onClick={createMyPairingCode}>
+          Create pairing code
+        </button>
+        {pairingCode ? (
+          <div className="deviceSecret">
+            <strong>{pairingCode}</strong>
+            <p>Expires: {pairingExpires}</p>
+            <code>nexora-forge setup --mode join-team --server &lt;TEAM_URL&gt; --code {pairingCode}</code>
+          </div>
+        ) : null}
+      </article>
+
+      {canManageMembers ? (
+        <article className="panel pipelineStep pipelineWide">
+          <span className="panelLabel">03 · TEAM MEMBERS</span>
+          <div className="teamMemberForm">
+            <label>
+              Member name
+              <input value={memberName} onChange={(event) => setMemberName(event.target.value)} />
+            </label>
+            <label>
+              Role
+              <select value={memberRole} onChange={(event) => setMemberRole(event.target.value)}>
+                <option value="admin">Admin</option>
+                <option value="lead">Lead</option>
+                <option value="artist">Artist</option>
+                <option value="reviewer">Reviewer</option>
+                <option value="viewer">Viewer</option>
+              </select>
+            </label>
+          </div>
+          <button className="secondaryButton" disabled={busy} onClick={addMember}>
+            Add member & create setup code
+          </button>
+          {memberPairing ? (
+            <div className="deviceSecret">
+              <strong>Send only this one-time code to the member</strong>
+              <code>{memberPairing}</code>
+            </div>
+          ) : null}
+          {workspace?.members.length ? (
+            <div className="memberList">
+              {workspace.members.map((member) => (
+                <span key={member.user_id}>
+                  {member.display_name ?? member.user_id} · {member.role}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </article>
+      ) : null}
+
       <article className="panel pipelineStep pipelineWide">
-        <span className="panelLabel">03 · STRUCTURED BLENDER JOB</span>
-        <label>Task<input value={task} onChange={(e) => setTask(e.target.value)} /></label>
+        <span className="panelLabel">04 · STRUCTURED BLENDER JOB</span>
+        <div className="teamMemberForm">
+          <label>
+            Project
+            <select
+              value={projectId}
+              onChange={(event) => {
+                setProjectId(event.target.value);
+                setAssetId("");
+              }}
+            >
+              <option value="">Select project</option>
+              {workspace?.projects.map((project) => (
+                <option key={project.id} value={project.id}>{project.name}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Asset
+            <select value={assetId} onChange={(event) => setAssetId(event.target.value)}>
+              <option value="">No specific asset</option>
+              {projectAssets.map((asset) => (
+                <option key={asset.id} value={asset.id}>{asset.name}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <label>Task<input value={task} onChange={(event) => setTask(event.target.value)} /></label>
         <label>
           Execution plan
-          <textarea rows={18} value={plan} onChange={(e) => setPlan(e.target.value)} />
+          <textarea rows={18} value={plan} onChange={(event) => setPlan(event.target.value)} />
         </label>
-        <button className="forgeButton" disabled={busy || !bootstrap} onClick={enqueue}>Queue job</button>
+        <button className="forgeButton" disabled={busy || !workspace || !projectId} onClick={enqueue}>
+          Queue job
+        </button>
       </article>
 
       <article className="panel pipelineStep pipelineWide">
-        <span className="panelLabel">04 · LEASE → BLENDER → PREVIEW → REVIEW</span>
+        <span className="panelLabel">05 · LEASE → BLENDER → PREVIEW → REVIEW</span>
         {jobId ? (
           <>
             <code className="jobId">{jobId}</code>

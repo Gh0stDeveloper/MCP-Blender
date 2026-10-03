@@ -19,7 +19,7 @@ A secure MCP automation platform I built to connect modern AI systems with Blend
 [![Cloudflare](https://img.shields.io/badge/Cloudflare-Tunnel-F38020?style=flat-square&logo=cloudflare&logoColor=white)](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
 [![Vercel](https://img.shields.io/badge/Vercel-AI_Gateway-000000?style=flat-square&logo=vercel&logoColor=white)](https://vercel.com/ai-gateway)
 
-[Website](apps/web) · [Architecture](docs/ARCHITECTURE.md) · [Security](docs/SECURITY.md) · [Cloud](docs/CLOUD.md) · [Production Pipeline](docs/PRODUCTION_PIPELINE.md) · [Tool Catalog](docs/TOOL_CATALOG.md)
+[Installer](docs/INSTALLER.md) · [Architecture](docs/ARCHITECTURE.md) · [Security](docs/SECURITY.md) · [Cloud](docs/CLOUD.md) · [Production Pipeline](docs/PRODUCTION_PIPELINE.md) · [Tool Catalog](docs/TOOL_CATALOG.md)
 
 </div>
 
@@ -223,41 +223,107 @@ From there I can:
 
 ---
 
-## Quick start — local MCP
+## Installation
 
-### Requirements
-
-- Python 3.11+
-- Blender 4.5+ / compatible newer release
-- `uv` recommended
-
-### Install
+Nexora Forge now includes a local installer and lifecycle manager. The recommended first command is:
 
 ```bash
-git clone https://github.com/Gh0stDeveloper/MCP-Blender.git
-cd MCP-Blender
-
-python scripts/bootstrap.py
 uv sync --all-extras
-uv run nexora-forge-mcp
+uv run nexora-forge setup
 ```
 
-Default MCP endpoint:
+Or use the platform wrappers:
+
+**Linux / macOS**
+
+```bash
+./scripts/install.sh
+```
+
+**Windows PowerShell**
+
+```powershell
+.\scripts\install.ps1
+```
+
+The setup wizard asks how the installation will be used:
 
 ```text
-http://127.0.0.1:8765/mcp
+How do you want to use Nexora Forge?
+
+1) Individual
+2) Team Host
+3) Join Team
 ```
+
+### Individual
+
+```bash
+nexora-forge setup --mode individual
+nexora-forge start
+nexora-forge doctor
+```
+
+This creates the private local configuration, workspace and MCP/Blender bridge secrets.
+
+### Team Host
+
+```bash
+nexora-forge setup --mode team-host
+nexora-forge start
+```
+
+With Docker, Node.js and npm available, the installer prepares the private PostgreSQL control plane, applies migrations, builds the web UI, creates the initial organization/project and pairs the host workstation.
+
+### Join Team
+
+The owner/admin creates a member:
+
+```bash
+nexora-forge member add --name "Artist A" --role artist
+```
+
+Nexora Forge returns a temporary single-use code such as:
+
+```text
+NXR-ABCD-EFGH-JKLM
+```
+
+The member joins with:
+
+```bash
+nexora-forge setup --mode join-team \
+  --server http://TEAM-HOST:3000 \
+  --code NXR-ABCD-EFGH-JKLM
+```
+
+The pairing flow creates the member and Device Agent credentials automatically. No UUIDs or database IDs need to be copied.
+
+### Lifecycle commands
+
+```bash
+nexora-forge start
+nexora-forge stop
+nexora-forge status
+nexora-forge doctor
+nexora-forge update
+nexora-forge pair
+nexora-forge token
+```
+
+See [docs/INSTALLER.md](docs/INSTALLER.md) for the complete installer, pairing, role and troubleshooting guide.
 
 ### Blender extension
 
 Install the `blender_extension` directory as a Blender extension/development extension.
 
-Configure the same `NEXORA_BRIDGE_SECRET` generated in `.env`, then start the bridge from the **Nexora Forge MCP** Blender panel.
+Configure the `NEXORA_BRIDGE_SECRET` generated in `.env`, then start the bridge from the **Nexora Forge MCP** Blender panel.
 
-Default bridge:
+Default local endpoints:
 
 ```text
-http://127.0.0.1:9876
+MCP Gateway:    http://127.0.0.1:8765/mcp
+Blender Bridge: http://127.0.0.1:9876
 ```
 
 > I intentionally keep the Blender bridge on loopback. Port `9876` should never be exposed directly to the Internet.
@@ -285,80 +351,78 @@ See:
 
 ---
 
-## Quick start — Forge Cloud
+## Team Host / Forge Cloud
 
-### 1. PostgreSQL
+For normal use I let the installer configure Forge Cloud:
 
-Set:
-
-```env
-DATABASE_URL=postgresql://user:password@127.0.0.1:5432/nexora_forge
-NEXORA_CLOUD_API_TOKEN=generate-a-long-random-token
+```bash
+nexora-forge setup --mode team-host
+nexora-forge start
 ```
 
-Apply migrations:
+The Team Host installer prepares:
+
+- PostgreSQL in a private Docker Compose service;
+- all migrations under `deploy/postgres/`;
+- the initial organization/project;
+- owner and host-device credentials;
+- local artifact storage;
+- the Next.js control center;
+- the local MCP gateway and Device Agent runtime configuration.
+
+The control center provides:
+
+```text
+/cloud
+/cloud/pipeline
+/cloud/review/<jobId>
+```
+
+The owner/admin can create members and one-time pairing codes directly from the pipeline UI or CLI.
+
+### Manual/advanced setup
+
+Manual PostgreSQL deployments remain supported. Apply all migrations in order, including the local team-access migration:
 
 ```bash
 psql "$DATABASE_URL" -f deploy/postgres/001_forge_cloud.sql
 psql "$DATABASE_URL" -f deploy/postgres/002_production_pipeline.sql
+psql "$DATABASE_URL" -f deploy/postgres/003_local_team_access.sql
 ```
 
-### 2. Object storage
-
-For development or a small self-hosted installation:
+Local storage remains the default:
 
 ```env
 NEXORA_STORAGE_DRIVER=local
 NEXORA_STORAGE_ROOT=.nexora-storage
 ```
 
-For production I can switch to S3-compatible storage:
-
-```env
-NEXORA_STORAGE_DRIVER=s3
-NEXORA_S3_REGION=auto
-NEXORA_S3_BUCKET=nexora-forge
-NEXORA_S3_ENDPOINT=https://your-s3-compatible-endpoint
-NEXORA_S3_ACCESS_KEY_ID=...
-NEXORA_S3_SECRET_ACCESS_KEY=...
-```
-
-The storage adapter works with S3-compatible services such as AWS S3, Cloudflare R2 or MinIO when configured with the appropriate endpoint and credentials.
-
-### 3. Web control plane
-
-```bash
-cd apps/web
-npm install
-npm run dev
-```
-
-Useful routes:
-
-| Route | Purpose |
-| --- | --- |
-| `/cloud` | multi-agent / multi-model orchestration |
-| `/cloud/pipeline` | bootstrap, device enrollment and structured job queue |
-| `/cloud/review/<jobId>` | preview + human approval |
-| `/dashboard` | local MCP control-center information |
+A private team may instead configure its own S3-compatible storage such as S3, R2 or MinIO.
 
 ---
 
 ## Device Agent
 
-After enrolling a workstation through `/cloud/pipeline` or the enrollment API, I save the one-time device token on that workstation.
+The Device Agent remains outbound-only: it polls the private Team Host, leases work, talks to the local Blender bridge, uploads results and waits for review.
+
+The recommended enrollment path is now a one-time pairing code:
 
 ```bash
-export NEXORA_CLOUD_URL=https://forge.example.com
-export NEXORA_DEVICE_TOKEN=nfd_...
-export NEXORA_BRIDGE_SECRET=...
-python device_agent/nexora_forge_agent.py
+nexora-forge setup --mode join-team \
+  --server http://TEAM-HOST:3000 \
+  --code NXR-ABCD-EFGH-JKLM
+```
+
+That command stores the Device Agent and member credentials locally. After the Blender extension is configured:
+
+```bash
+nexora-forge start
 ```
 
 The Device Agent:
 
 1. reads local Blender/bridge capabilities;
-2. polls Cloud for an atomic lease;
+2. polls the private control plane for an atomic lease;
 3. maintains lease heartbeat;
 4. executes the structured plan locally;
 5. saves a reproducible `.blend` checkpoint;
@@ -366,7 +430,7 @@ The Device Agent:
 7. uploads preview/Blend/exports to object storage;
 8. submits the job to human review.
 
-I designed it as an outbound-only worker. It does not open a public inbound port on the workstation.
+It never opens a public inbound workstation port.
 
 See [device_agent/README.md](device_agent/README.md).
 
@@ -376,19 +440,19 @@ See [device_agent/README.md](device_agent/README.md).
 
 | Endpoint | Auth | Purpose |
 | --- | --- | --- |
-| `POST /api/cloud/bootstrap` | Cloud admin | create organization/project/initial asset |
-| `POST /api/cloud/devices/enroll` | Cloud admin | enroll workstation and issue one-time device token |
-| `POST /api/cloud/jobs` | Cloud admin | queue structured Blender job |
+| `POST /api/cloud/bootstrap` | Local bootstrap admin | create organization/project/initial owner |\n| `GET /api/cloud/me` | Team member | discover own organization, projects, assets and devices |\n| `POST /api/cloud/team/members` | Owner/Admin | add a local team member |\n| `POST /api/cloud/pairing` | Production member | create a one-time device setup code |\n| `POST /api/cloud/pairing/redeem` | One-time code | pair member + Device Agent workstation |
+| `POST /api/cloud/devices/enroll` | Member/admin | direct workstation enrollment (pairing preferred) |
+| `POST /api/cloud/jobs` | Owner/Admin/Lead/Artist | queue structured Blender job |
 | `POST /api/cloud/device/lease` | Device token | atomically claim eligible job |
 | `POST /api/cloud/device/jobs/:id/heartbeat` | Device token + lease | renew lease |
 | `PUT /api/cloud/device/jobs/:id/artifacts` | Device token + lease | upload preview/.blend/export/log |
 | `POST /api/cloud/device/jobs/:id/complete` | Device token + lease | finish execution |
 | `POST /api/cloud/device/jobs/:id/fail` | Device token + lease | fail execution safely |
-| `GET /api/cloud/jobs/:id` | Cloud admin | inspect job/artifacts/review |
-| `POST /api/cloud/jobs/:id/review` | Cloud admin | approve / reject / request changes |
-| `GET/POST/DELETE /api/cloud/assets/:id/lock` | Cloud admin | inspect/acquire/release asset lock |
-| `GET /api/cloud/assets/:id/versions` | Cloud admin | list approved versions |
-| `GET /api/cloud/artifacts/:id` | Cloud admin | authenticated artifact/preview download |
+| `GET /api/cloud/jobs/:id` | Team member | inspect an authorized job |
+| `POST /api/cloud/jobs/:id/review` | Owner/Admin/Lead/Reviewer | approve / reject / request changes |
+| `GET/POST/DELETE /api/cloud/assets/:id/lock` | Team member / production roles | inspect/acquire/release asset lock |
+| `GET /api/cloud/assets/:id/versions` | Team member | list approved versions |
+| `GET /api/cloud/artifacts/:id` | Team member | authenticated artifact/preview download |
 
 ---
 
@@ -473,7 +537,7 @@ For AI provider credentials, local/private installations can use server-side env
 
 ## Documentation
 
-- [Architecture](docs/ARCHITECTURE.md)
+- [Installer & local setup](docs/INSTALLER.md)\n- [Architecture](docs/ARCHITECTURE.md)
 - [Security](docs/SECURITY.md)
 - [Tool catalog](docs/TOOL_CATALOG.md)
 - [Forge Cloud](docs/CLOUD.md)

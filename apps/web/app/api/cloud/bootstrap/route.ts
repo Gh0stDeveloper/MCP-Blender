@@ -1,4 +1,4 @@
-import { cloudAuthorized } from "@/lib/forge-cloud/auth";
+import { cloudAuthorized, hashToken, issueMemberToken } from "@/lib/forge-cloud/auth";
 import { transaction } from "@/lib/forge-cloud/db";
 
 export const runtime = "nodejs";
@@ -45,11 +45,23 @@ export async function POST(request: Request) {
       );
       const organizationId = org.rows[0].id;
 
+      const ownerToken = issueMemberToken();
       await client.query(
-        `insert into organization_members (organization_id, user_id, role)
-         values ($1,$2,'owner')
-         on conflict (organization_id,user_id) do update set role='owner'`,
-        [organizationId, ownerUserId],
+        `insert into organization_members (
+           organization_id, user_id, role, display_name, token_created_at
+         )
+         values ($1,$2,'owner',$3,now())
+         on conflict (organization_id,user_id) do update
+           set role='owner',
+               display_name=excluded.display_name,
+               token_created_at=now()`,
+        [organizationId, ownerUserId, "Owner"],
+      );
+      await client.query(
+        `insert into member_access_tokens (
+           organization_id, user_id, token_hash, label
+         ) values ($1,$2,$3,'bootstrap-owner')`,
+        [organizationId, ownerUserId, hashToken(ownerToken)],
       );
 
       const project = await client.query<{ id: string }>(
@@ -71,9 +83,12 @@ export async function POST(request: Request) {
         assetId = asset.rows[0].id;
       }
 
-      return { organizationId, projectId, assetId };
+      return { organizationId, projectId, assetId, ownerToken };
     });
-    return Response.json(result, { status: 201 });
+    return Response.json({
+      ...result,
+      warning: "The owner token is shown once. Save it in the local Nexora Forge configuration.",
+    }, { status: 201 });
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : "cloud_bootstrap_failed" },

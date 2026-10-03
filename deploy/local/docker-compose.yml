@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nexora_forge
+      POSTGRES_USER: nexora
+      POSTGRES_PASSWORD: ${NEXORA_POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - nexora_forge_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexora -d nexora_forge"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  nexora_forge_postgres:

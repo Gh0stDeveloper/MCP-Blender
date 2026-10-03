@@ -109,9 +109,18 @@ create table if not exists jobs (
   finished_at timestamptz
 );
 
-alter table asset_versions
-  add constraint asset_versions_source_job_fk
-  foreign key (source_job_id) references jobs(id) on delete set null;
+do $
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'asset_versions_source_job_fk'
+  ) then
+    alter table asset_versions
+      add constraint asset_versions_source_job_fk
+      foreign key (source_job_id) references jobs(id) on delete set null;
+  end if;
+end
+$;
 
 create table if not exists job_agent_runs (
   id uuid primary key default gen_random_uuid(),
